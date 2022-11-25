@@ -1,0 +1,19 @@
+2022-11-25 18:53:13,527 : 2022_11_25_18_53_13
+2022-11-25 18:53:13,527 : Lickometer JumpStand version: v1.0:2022-11-24
+2022-11-25 18:53:13,527 : Lickometer_sampling: 2000 LickFreq_threshold: 2.50 Speed: 200 Reward: 500
+2022-11-25 18:53:14,528 : 
+2022-11-25 18:53:14,534 : Horizontal on the left side: True
+2022-11-25 18:53:14,534 : Horizontal-<left> Vertical-<right>
+2022-11-25 18:53:17,402 : Enter pressed to show stimuli
+2022-11-25 18:53:21,543 : 
+2022-11-25 18:53:21,546 : Horizontal on the left side: False
+2022-11-25 18:53:21,546 : Horizontal-<right> Vertical-<left>
+2022-11-25 18:53:22,579 : Enter pressed to show stimuli
+2022-11-25 18:53:26,792 : 
+2022-11-25 18:53:26,797 : Horizontal on the left side: False
+2022-11-25 18:53:26,797 : Horizontal-<right> Vertical-<left>
+2022-11-25 18:53:27,314 : Enter pressed to show stimuli
+2022-11-25 18:53:30,693 : 
+2022-11-25 18:53:30,696 : Horizontal on the left side: True
+2022-11-25 18:53:30,696 : Horizontal-<left> Vertical-<right>
+2022-11-25 18:53:31,802 : Enter pressed to show stimuli
