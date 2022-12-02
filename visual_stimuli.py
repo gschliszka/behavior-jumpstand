@@ -1,13 +1,14 @@
 import serial
 from math import sqrt, ceil
 from psychopy.tools import monitorunittools
-from psychopy import monitors, visual, core, event
+from psychopy import monitors, visual, core, event, sound
 from monitors import mymonitors
 
 
 import os
 import time
 import logging
+import pyautogui
 
 
 class VisualStimulator:
@@ -67,9 +68,22 @@ class VisualStimulator:
 
             
 class StaticGratingDual(VisualStimulator):
-    def __init__(self, params: dict, port: str = None):
+    def __init__(self, params: dict, stat_params: dict, port: str = None):
         super(StaticGratingDual, self).__init__(params, port)
+        self.stat_params = stat_params
 
+        # Set sound cues:
+        self.w_sound = sound.backend_sounddevice.SoundDeviceSound(value='C', secs=0.5, octave=6, stereo=-1, volume=1.0,
+                                                                  loops=0,
+                                                                  sampleRate=44100, blockSize=128, preBuffer=- 1,
+                                                                  hamming=True,
+                                                                  startTime=0, stopTime=- 1, name='', autoLog=True)
+
+        self.c_sound = sound.backend_sounddevice.SoundDeviceSound(value='C', secs=0.5, octave=5, stereo=-1, volume=1.0,
+                                                                  loops=0,
+                                                                  sampleRate=44100, blockSize=128, preBuffer=- 1,
+                                                                  hamming=True,
+                                                                  startTime=0, stopTime=- 1, name='', autoLog=True)
         # Set up the 2nd psychopy monitor
         self.mon2 = monitors.Monitor(self.params['monitor2'], distance=self.params['distance'],
                                      width=mymonitors[self.params['monitor2']]['width'],
@@ -77,7 +91,7 @@ class StaticGratingDual(VisualStimulator):
 
         # Set up the 2nd psychopy window
         self.win2 = visual.Window(size=mymonitors[self.params['monitor2']]['resolution'],
-                                  fullscr=False, screen=2, allowGUI=False, allowStencil=False,
+                                  fullscr=True, screen=2, allowGUI=False, allowStencil=False,
                                   monitor=self.mon2, color=self.params['color_bg'], colorSpace='rgb',
                                   blendMode='avg', useFBO=True)      # screen: set to 2 if 3 monitors used
 
@@ -122,7 +136,8 @@ class StaticGratingDual(VisualStimulator):
         parent_dir = os.path.split(current_dir)[0]
         path = os.path.join(current_dir, 'JumpStandLog')
 
-        logging.basicConfig(filename=f"{path}/log_{time.strftime('%Y_%m_%d_%H_%M_%S', time.localtime())}.txt",
+        name = "Gazsi"
+        logging.basicConfig(filename=f"{path}/log_test_{name}_{time.strftime('%Y_%m_%d_%H_%M_%S', time.localtime())}.txt",
                             level=logging.DEBUG, format="%(asctime)s : %(message)s")
 
         logging.debug(f"{time.strftime('%Y_%m_%d_%H_%M_%S', time.localtime())}")
@@ -161,8 +176,10 @@ class StaticGratingDual(VisualStimulator):
         print(f'Horizontal stim on <{side_of_horizontal}> side\nVertical stim on <{side_of_vertical}> side')
         print(F"Direction: {direction} --> left horizontal? - {horizontal_left}")
 
-        logging.debug(f"Horizontal on the left side: {horizontal_left}")
-        logging.debug(f"Horizontal-<{side_of_horizontal}> Vertical-<{side_of_vertical}>")
+        # logging.debug(f"Horizontal on the left side: {horizontal_left}")
+        self.stat_params['left'] += 1 if horizontal_left else 0
+        self.stat_params['right'] += 1 if not horizontal_left else 0
+        logging.debug(f"Horizontal:<{side_of_horizontal}> Vertical:<{side_of_vertical}>")
 
         self.r_stim.ori = direction
         self.l_stim.ori = 270 - direction
@@ -230,36 +247,27 @@ class StaticGratingDual(VisualStimulator):
                         print(f"\nHorizontal: {side_of_horizontal}, Response: {response}")
                         if side_of_horizontal == response:
                             print('--> Good job!')
+                            logging.debug(f"Correct")
+                            self.stat_params['correct'] += 1
+                            self.stat_params['left_correct'] += 1 if horizontal_left else 0
+                            self.stat_params['right_correct'] += 1 if not horizontal_left else 0
+                            self.c_sound.stop()
+                            self.c_sound.play()
+                            core.wait(0.5)
                             self.params['arduino'].write_order(self.states.REW)
-                            self.l_green.setAutoDraw(True)
+                            # self.l_green.setAutoDraw(True)
                         else:
                             print('--> Wrong! ')
+                            logging.debug(f"Wrong")
+                            self.stat_params['wrong'] += 1
+                            self.stat_params['left_wrong'] += 1 if horizontal_left else 0
+                            self.stat_params['right_wrong'] += 1 if not horizontal_left else 0
+                            self.w_sound.stop()
+                            self.w_sound.play()
+                            core.wait(0.5)
                             self.params['arduino'].write_order(self.states.NOR)
-                            self.r_red.setAutoDraw(True)
+                            # self.r_red.setAutoDraw(True)
 
-                        """
-                        if horizontal_left:  # Indicate the wanted (horizontal) side
-                            if 'r' in left_response:
-                                print("\t--> Good job!")
-                                logging.debug("Response: correct")
-                                # self.params['arduino'].write_order(self.states.REW)
-                            else:
-                                print("\t--> Hm... not even close")
-                                logging.debug("Response: wrong")
-                                # self.params['arduino'].write_order(self.states.NOR)
-                            self.r_green.setAutoDraw(True)
-                            print(f"\tHor. left: {horizontal_left} name: {left_response}")
-                        elif not horizontal_left:
-                            if 'l' in left_response:
-                                print("\t--> Good job!")
-                                logging.debug("Response: correct")
-                                # self.params['arduino'].write_order(self.states.REW)
-                            else:
-                                print("\t--> Hm... not even close")
-                                logging.debug("Response: wrong")
-                                # self.params['arduino'].write_order(self.states.NOR)
-                            self.l_green.setAutoDraw(True)
-                            print(f"\tHor. left: {horizontal_left} name: {left_response}")"""
                         self.win_l.flip()
                         self.win_r.flip()
                         core.wait(1)
@@ -285,6 +293,7 @@ class StaticGratingDual(VisualStimulator):
         self.win_r.flip()
         self.win_r.flip()
         event.clearEvents()
+        pyautogui.moveTo(200, 200)
         print()
 
 

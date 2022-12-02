@@ -6,7 +6,7 @@ from psychopy import logging
 from visual_stimuli import StaticGratingDual
 
 
-def vis_stim_experiment_master(stim_type: str, stim_params: dict, experiment_params: dict, communication_params: dict,
+def vis_stim_experiment_master(stim_type: str, stim_params: dict, experiment_params: dict, stat_param: dict, communication_params: dict,
                                all_variables: dict):
     """
     Start visual stimulation and recording experiment with specified parameters.
@@ -93,9 +93,9 @@ def vis_stim_experiment_master(stim_type: str, stim_params: dict, experiment_par
 
     if communication_params['debug']:
         # no communication with recording PC in debug mode
-        stim = StimClass(params=stim_params)
+        stim = StimClass(params=stim_params, stat_params=stat_param)
     else:
-        stim = StimClass(params=stim_params, port=communication_params['com_port'])
+        stim = StimClass(params=stim_params, stat_params=stat_param, port=communication_params['com_port'])
 
         client = RpcClient([communication_params['ip'], communication_params['port']])
 

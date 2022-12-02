@@ -1,3 +1,5 @@
+import logging
+
 from vis_stim_experiment import vis_stim_experiment_master
 from lickometer import Protocol
 
@@ -49,7 +51,7 @@ stim_length = 5  # 0.5 for GCaMP7S
 baseline_after = 0  # originally 5, but we increased by 2 seconds, so all interesting frames are definitely recorded
 
 # Number of repetitions of all given stimulation directions
-repetitions = 2
+repetitions = 4
 
 # part of the stimulus that is stationary (in seconds)
 stationary_duration = 5
@@ -72,6 +74,9 @@ path_stim_log = r"C:\Data\FUS\vis_stim_logs\ "
 arduino = Protocol()
 orders = arduino.Order
 
+# levels
+
+
 # ---The lines below should not be modified!---
 experiment_params = {'animal_name': animal_name, 'awake_anest': awake_anest, 'position': position, 'eye': eye}
 
@@ -83,6 +88,10 @@ stim_params = {'monitor': monitor, 'monitor2': monitor2, "distance": distance, '
                'path_stim_log': path_stim_log, 'parameter_source_path': __file__,
                'arduino': arduino, 'orders': orders}
 
+stat_params = {'left': 0, 'left_correct': 0, 'left_wrong': 0,
+               'right': 0, 'right_correct': 0, 'right_wrong': 0,
+               'correct': 0, 'wrong': 0}
+
 communication_params = {'ip': ip, 'port': port, 'imaging_framerate': imaging_framerate, 'com_port': com_port,
                         'debug': debug, 'script_path': script_path, 'changing_parameter': changing_parameter}
 
@@ -90,4 +99,23 @@ _all_variables = locals()
 filtered_all_variables = {key: _all_variables[key] for key in _all_variables.keys() if key[0] != '_'}
 
 if __name__ == '__main__':
-    vis_stim_experiment_master('dual_static_grating', stim_params, experiment_params, communication_params, filtered_all_variables)
+    vis_stim_experiment_master('dual_static_grating', stim_params, experiment_params, stat_params, communication_params, filtered_all_variables)
+
+    print("\n------------------------------------------")
+    print(f"Left: {stat_params['left']}\nRight: {stat_params['right']}")
+    print(f"Correct: {stat_params['correct']}\nWrong: {stat_params['wrong']}")
+    print("------------------------------------------")
+    print(f"Precision: {stat_params['correct']/(stat_params['correct'] + stat_params['wrong'])} (correct / correct + wrong)")
+    print(f"left correct: {stat_params['left_correct']}, left wrong: {stat_params['left_wrong']}")
+    print(f"right correct: {stat_params['right_correct']}, right wrong: {stat_params['right_wrong']}")
+    print(f"Left side: {stat_params['left_correct']} / {stat_params['left_correct'] + stat_params['left_wrong']} = "
+          f"{stat_params['left_correct'] / (stat_params['left_correct'] + stat_params['left_wrong'])}")
+    print(f"Right side: {stat_params['right_correct']} / {stat_params['right_correct'] + stat_params['right_wrong']} = "
+          f"{stat_params['right_correct'] / (stat_params['right_correct'] + stat_params['right_wrong'])}")
+
+    logging.debug("------------------------------------------")
+    logging.debug(f"Left: {stat_params['left']} Right: {stat_params['right']} Correct: {stat_params['correct']} Wrong: {stat_params['wrong']}")
+    logging.debug(f"Precision: {stat_params['correct']/(stat_params['correct'] + stat_params['wrong'])} (correct / correct + wrong)")
+    logging.debug(f"Left correct: {stat_params['left_correct'] / (stat_params['left_correct'] + stat_params['left_wrong'])}")
+    logging.debug(f"Right correct: {stat_params['right_correct'] / (stat_params['right_correct'] + stat_params['right_wrong'])}")
+
