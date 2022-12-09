@@ -24,13 +24,15 @@ if lickemu:
     # split single screen in half
     grating_size = {gk1: 20 for gk1 in ['left', 'right']}
     grating_pos = {'left': (-5,0), 'right': (5,0)}
-    feedback_sound = {'reward': sound.Sound('A'), 'punish': sound.Sound('pinknoise.wav')}
+    feedback_sound = {'reward': sound.Sound('A'), 'punish': sound.Sound('pinknoise.wav', stopTime=1)}
     trialtext = 'Hit left key if you think correct pattern is shown on the left side; right key if correct pattern is on right side.'
 
 def punish():
+    feedback_sound['punish'].stop()
     feedback_sound['punish'].play()
 
 def deliver_reward():
+    feedback_sound['reward'].stop()
     feedback_sound['reward'].play()
 
 def wait_for_lickometer(lickometer_id:list, timeout=float('inf')):
@@ -79,11 +81,12 @@ def random_swap(previous:dict):
         previous[dkeys[1]].ori = r_temp
     return previous
 
+
 def run_trial():
     # Parameters
     motion = {'duration_max_s': 3, 'speed_cycles_per_second': 0.5}
 
-    sf = 0.1 # cycles/visual degree
+    sf = 0.1  # cycles/visual degree
     orientation = {'target': 0, 'alternative':90}  # target is rewarded, alternative is not rewarded
 
     try:  # try to get a previous parameters file
@@ -112,14 +115,13 @@ def run_trial():
 
     # create window and stimuli
     if lickemu:
-        win0 =  visual.Window([win_size['width'], win_size['height']],allowGUI=True,
-                        monitor='testMonitor', units='deg', backendConf={'winType':'pyglet'})
-        win = {sk1: win0 for sk1 in grating_size.keys()}  # emulation mode on single screen
+        win = {sk1: visual.Window([win_size['width'], win_size['height']], allowGUI=True, screen=si1,
+                             monitor='testMonitor', units='deg') for si1,sk1 in enumerate(grating_size.keys())}  # emulation mode on single screen
+        mouse = {wk1: event.Mouse(win=win[wk1]) for wk1 in win.keys()}
     else:
         raise NotImplementedError('add creation of two windows')
 
     sk = ['left', 'right']  # screen keys
-    mouse = {k1: event.Mouse(win=win[k1]) for k1 in sk}
     grating = {sk1: visual.GratingStim(win[sk1], sf=sf, size=grating_size[sk1], pos=grating_pos[sk1], mask='gauss',
                                 ori=orientation[k1]) for k1, sk1 in zip(orientation.keys(), sk)}
     from psychopy.tools.monitorunittools import posToPix
@@ -136,37 +138,34 @@ def run_trial():
                 'trial': visual.TextStim(win['left'], pos=[0,+3],text=trialtext),
                 'post': visual.TextStim(win['left'], pos=[0,+3],text='Put back animal to stand')}
     message_time = 1.5
-    if lickemu:
-        win['right'] = None  # no double flips of the same window if in emulation mode
+
     for thisIncrement in staircase:  # will continue the staircase until it terminates!
         messages['pre'].draw()
         [win[sk1].flip() for sk1 in win.keys() if win[sk1] is not None]
         core.wait(message_time)
         # keep screens blank until subject licks into lickometer on the stand
-        entry_response = 'timeout'
-        while entry_response == 'timeout':
-            entry_response = wait_for_lickometer(['up'], timeout=3)
+        entry_response = wait_for_lickometer(['up'])
 
         # animal licked into stand-lickometer: show stimulus
         # set orientation of gratings on two screens
         random_swap(grating)
 
         # set duration of motion as the staircase sets the next value
-        motion_dur = expInfo['motion_duration'] + thisIncrement
-        print(f"increment {thisIncrement} motion_duration: {expInfo['motion_duration']}")
         messages['trial'].draw()
         [win[sk1].flip() for sk1 in win.keys() if win[sk1] is not None]
         core.wait(message_time)
         # show moving grating on both screens
-        # TODO Abel, please insert here. After motion_dur seconds gratings should stop and stay last phase, return here and wait for full trial duration
         trial_clock.reset()
 
         while trial_clock.getTime() < thisIncrement:
             for sk in grating.keys():
                 grating[sk].phase = numpy.mod(trial_clock.getTime(), 1)
                 grating[sk].draw()
+                mpress = [mouse[k1].isPressedIn(grating[k1]) for k1 in grating.keys()]
+                if any(mpress):
+                    break
             [win[sk1].flip() for sk1 in win.keys() if win[sk1] is not None]
-
+        # TODO : only accept lick from lickometer that is next to the screen where cat jumped, if lick event in other lickometer-> punish
         lick_choice = wait_for_lickometer(['left', 'right'])
         print(f"licked {lick_choice}")
         if lick_choice is not None:  # subject did respond
@@ -184,12 +183,11 @@ def run_trial():
         intertrial.draw()
         messages['post'].draw()
         [win[sk1].flip() for sk1 in win.keys() if win[sk1] is not None]
-        allKeys=event.waitKeys(maxWait=message_time)
+        allKeys = event.waitKeys(maxWait=message_time)
         if allKeys is not None and 'q' in allKeys:
             print('user abort')
-            break  # manual abort experiment
+            core.quit()  # manual abort experiment
         event.clearEvents()  # clear other (eg mouse) events - they clog the buffer
-
 
     # staircase has ended
     dataFile.close()
