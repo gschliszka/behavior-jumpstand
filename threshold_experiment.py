@@ -1,6 +1,10 @@
 '''Decrease motion duration while teaching animal to discriminate vertical vs horizontal orientation.
 This code assumes animal knows lickometer and jump stand.
 '''
+from psychopy import prefs
+import pyglet
+prefs.general['winType']=pyglet
+prefs.validate()
 from psychopy import core, visual, gui, data, event, sound
 from psychopy.tools.filetools import fromFile, toFile
 import numpy
@@ -104,12 +108,12 @@ def run_trial():
     staircase = data.StairHandler(startVal = motion['duration_max_s'],
                               stepType = 'db', stepSize=[8,4,2], minVal=0.1,
                               nUp=1, nDown=3,  # will home in on the 80% threshold
-                              nTrials=1)
+                              nTrials=1, nReversals=2)
 
     # create window and stimuli
     if lickemu:
         win0 =  visual.Window([win_size['width'], win_size['height']],allowGUI=True,
-                        monitor='testMonitor', units='deg')
+                        monitor='testMonitor', units='deg', backendConf={'winType':'pyglet'})
         win = {sk1: win0 for sk1 in grating_size.keys()}  # emulation mode on single screen
     else:
         raise NotImplementedError('add creation of two windows')
@@ -182,6 +186,7 @@ def run_trial():
         [win[sk1].flip() for sk1 in win.keys() if win[sk1] is not None]
         allKeys=event.waitKeys(maxWait=message_time)
         if allKeys is not None and 'q' in allKeys:
+            print('user abort')
             break  # manual abort experiment
         event.clearEvents()  # clear other (eg mouse) events - they clog the buffer
 
@@ -205,9 +210,9 @@ def run_trial():
 
     win['left'].flip()
     core.wait(1)
-    win.close()
+    win['left'].close()
     core.quit()
 
 
-def test_stimulus():
+if __name__ == '__main__':
     run_trial()
