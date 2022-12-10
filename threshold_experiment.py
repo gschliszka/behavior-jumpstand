@@ -35,7 +35,7 @@ def deliver_reward():
     feedback_sound['reward'].stop()
     feedback_sound['reward'].play()
 
-def wait_for_lickometer(lickometer_id:list, timeout=float('inf')):
+def wait_for_lickometer(enabled_lickometers:list, timeout=float('inf')):
     '''
 
     Parameters
@@ -47,14 +47,19 @@ def wait_for_lickometer(lickometer_id:list, timeout=float('inf')):
     -------
 
     '''
-    kopt = ['left', 'right','up']
+    kopt = ['left', 'right', 'up']
     print(f"Waiting for lick for {timeout} seconds")
     if lickemu:  # wait for mouse press
         key = event.waitKeys(maxWait=timeout, clearEvents=True)  # wait for participant to respond
         print(key)
-        if key is None or not any([k1 in key for k1 in kopt]) or any([k2 not in lickometer_id for k2 in key]):
+        # either no key hit (timeout) or key is not left/right/up or key is not enabled
+        if key is None or not any([k1 in key for k1 in kopt]) or any([k2 not in enabled_lickometers for k2 in key]):
             event.clearEvents()
-            return
+            if any([k2 not in enabled_lickometers for k2 in key]):
+                # punish if subject activates wrong (not enabled) lickometer
+                punish()
+                return key[-1]  # since it was a lick, return it
+            return  # there was no lick, timeout
         event.clearEvents()
         return key[-1]
     else:
@@ -81,31 +86,101 @@ def random_swap(previous:dict):
         previous[dkeys[1]].ori = r_temp
     return previous
 
+def iterate_motion_time_grating_2afc(win, grating, mouse, messages, message_time, trial_clock, motion_time, timeout_time):
+    if messages: messages['pre'].draw()
+    [win[sk1].flip() for sk1 in win.keys() if win[sk1] is not None]
+    core.wait(message_time)
+    # keep screens blank until subject licks into lickometer on the stand
+    entry_response = wait_for_lickometer(['up'])
 
-def run_trial():
-    # Parameters
-    motion = {'duration_max_s': 3, 'speed_cycles_per_second': 0.5}
+    # animal licked into stand-lickometer: show stimulus
+    # set orientation of gratings on two screens
+    random_swap(grating)
 
-    sf = 0.1  # cycles/visual degree
-    orientation = {'target': 0, 'alternative':90}  # target is rewarded, alternative is not rewarded
+    # set duration of motion as the staircase sets the next value
+    if messages: messages['trial'].draw()
+    [win[sk1].flip() for sk1 in win.keys() if win[sk1] is not None]
+    core.wait(message_time)
+    # show moving grating on both screens
+    trial_clock.reset()
+    mpress = [0,0]
+    while (trial_clock.getTime() < timeout_time) and not any(mpress):
+        for sk in grating.keys():
+            # move grating until specified time then leave last grating phase constant until timeout time
+            if trial_clock.getTime() < motion_time:
+                grating[sk].phase = numpy.mod(trial_clock.getTime(), 1)
+            grating[sk].draw()
+            mpress = [mouse[k1].isPressedIn(grating[k1]) for k1 in grating.keys()]
+            if any(mpress):
+                break
+        [win[sk1].flip() for sk1 in win.keys() if win[sk1] is not None]
+
+    return mpress, trial_clock.getTime()  # [True False] if first screen chosen
+
+def init_experiment(motion):
 
     try:  # try to get a previous parameters file
         expInfo = fromFile('lastParams.pickle')
     except:  # if not there then use a default set
-        expInfo = {'observer':'jwp', 'motion_duration':motion['duration_max_s']}
+        expInfo = {'observer': 'jwp', 'motion_duration': motion['duration_max_s']}
     expInfo['dateStr'] = data.getDateStr()  # add the current time
     # present a dialogue to change params
     if 0:
         dlg = gui.DlgFromDict(expInfo, title='motion duration experiment', fixed=['dateStr'])
-    if 1: #dlg.OK:
+    if 1:  # dlg.OK:
         toFile('lastParams.pickle', expInfo)  # save params to file for next time
     else:
         core.quit()  # the user hit cancel so exit
 
     # make a text file to save data
     fileName = expInfo['observer'] + expInfo['dateStr']
-    dataFile = open(fileName+'.csv', 'w')  # a simple text file with 'comma-separated-values'
+    dataFile = open(fileName + '.csv', 'w')  # a simple text file with 'comma-separated-values'
     dataFile.write('targetSide,oriIncrement,correct\n')
+    return expInfo, dataFile, fileName
+
+def init_stimulus(show_messages=False):
+    # Parameters
+    motion = {'duration_max_s': 3, 'speed_cycles_per_second': 0.5}
+    timeout_time = motion['duration_max_s'] + 3
+
+    sf = 0.1  # cycles/visual degree
+    orientation = {'target': 0, 'alternative': 90}  # target is rewarded, alternative is not rewarded
+
+    # create window and stimuli
+    if lickemu:
+        win = {sk1: visual.Window([win_size['width'], win_size['height']], allowGUI=True, screen=si1,
+                                  monitor='testMonitor', units='deg') for si1, sk1 in
+               enumerate(grating_size.keys())}  # emulation mode on single screen
+        mouse = {wk1: event.Mouse(win=win[wk1]) for wk1 in win.keys()}
+    else:
+        raise NotImplementedError('add creation of two windows')
+
+    sk = ['left', 'right']  # screen keys
+    grating = {sk1: visual.GratingStim(win[sk1], sf=sf, size=grating_size[sk1], pos=grating_pos[sk1], mask='gauss',
+                                       ori=orientation[k1]) for k1, sk1 in zip(orientation.keys(), sk)}
+    from psychopy.tools.monitorunittools import posToPix
+    ptxt = ' '.join([repr(posToPix(grating[gk1])) for gk1 in grating.keys()])
+    print(f"grating positions {ptxt}")
+
+    intertrial = visual.GratingStim(win['left'], sf=0, color=-1, colorSpace='rgb', size=win_size['width'], tex=None, )
+
+    # and some handy clocks to keep track of time
+    trial_clock = core.Clock()
+
+    # display instructions and wait
+    if show_messages:
+        messages = {'pre': visual.TextStim(win['left'], pos=[0, +3],
+                                       text='Hit up arrow key to start trial within 3s, q to abort experiment'),
+                'trial': visual.TextStim(win['left'], pos=[0, +3], text=trialtext),
+                'post': visual.TextStim(win['left'], pos=[0, +3], text='Put back animal to stand')}
+    else:
+        messages = None
+    message_time = 1.5
+    return win, grating, mouse, messages, message_time, intertrial, trial_clock, motion, orientation, timeout_time
+
+def run_staircase():
+    win, grating, mouse, messages, message_time, intertrial, trial_clock, motion, orientation, timeout_time = init_stimulus()
+    expInfo, dataFile, fileName = init_experiment(motion)
 
     # create the staircase handler
     staircase = data.StairHandler(startVal = motion['duration_max_s'],
@@ -113,75 +188,44 @@ def run_trial():
                               nUp=1, nDown=3,  # will home in on the 80% threshold
                               nTrials=1, nReversals=2)
 
-    # create window and stimuli
-    if lickemu:
-        win = {sk1: visual.Window([win_size['width'], win_size['height']], allowGUI=True, screen=si1,
-                             monitor='testMonitor', units='deg') for si1,sk1 in enumerate(grating_size.keys())}  # emulation mode on single screen
-        mouse = {wk1: event.Mouse(win=win[wk1]) for wk1 in win.keys()}
-    else:
-        raise NotImplementedError('add creation of two windows')
-
-    sk = ['left', 'right']  # screen keys
-    grating = {sk1: visual.GratingStim(win[sk1], sf=sf, size=grating_size[sk1], pos=grating_pos[sk1], mask='gauss',
-                                ori=orientation[k1]) for k1, sk1 in zip(orientation.keys(), sk)}
-    from psychopy.tools.monitorunittools import posToPix
-    ptxt = ' '.join([repr(posToPix(grating[gk1])) for gk1 in grating.keys()])
-    print(f"grating positions {ptxt}")
-
-    intertrial = visual.GratingStim(win['left'], sf=0, color = -1, colorSpace='rgb', size=win_size['width'], tex=None, )
-
-    # and some handy clocks to keep track of time
-    trial_clock = core.Clock()
-
-    # display instructions and wait
-    messages = {'pre': visual.TextStim(win['left'], pos=[0,+3],text='Hit up arrow key to start trial within 3s, q to abort experiment'),
-                'trial': visual.TextStim(win['left'], pos=[0,+3],text=trialtext),
-                'post': visual.TextStim(win['left'], pos=[0,+3],text='Put back animal to stand')}
-    message_time = 1.5
 
     for thisIncrement in staircase:  # will continue the staircase until it terminates!
-        messages['pre'].draw()
-        [win[sk1].flip() for sk1 in win.keys() if win[sk1] is not None]
-        core.wait(message_time)
-        # keep screens blank until subject licks into lickometer on the stand
-        entry_response = wait_for_lickometer(['up'])
 
-        # animal licked into stand-lickometer: show stimulus
-        # set orientation of gratings on two screens
-        random_swap(grating)
+        mouse_choice, choice_time_s = iterate_motion_time_grating_2afc(win, grating, mouse, messages, message_time, trial_clock, thisIncrement, timeout_time)
 
-        # set duration of motion as the staircase sets the next value
-        messages['trial'].draw()
-        [win[sk1].flip() for sk1 in win.keys() if win[sk1] is not None]
-        core.wait(message_time)
-        # show moving grating on both screens
-        trial_clock.reset()
+        if choice_time_s >= timeout_time:
+            punish()
+            if messages: messages['post'].text = f"Timeout, make your choice faster"
+            core.wait(1)
+            continue
 
-        while trial_clock.getTime() < thisIncrement:
-            for sk in grating.keys():
-                grating[sk].phase = numpy.mod(trial_clock.getTime(), 1)
-                grating[sk].draw()
-                mpress = [mouse[k1].isPressedIn(grating[k1]) for k1 in grating.keys()]
-                if any(mpress):
-                    break
-            [win[sk1].flip() for sk1 in win.keys() if win[sk1] is not None]
+        # This should not happen but best to be in control: if subject activates lickometer on the other side->punish
+        enable_lickometer = 'left' if mouse_choice[0] else 'right'
         # TODO : only accept lick from lickometer that is next to the screen where cat jumped, if lick event in other lickometer-> punish
-        lick_choice = wait_for_lickometer(['left', 'right'])
-        print(f"licked {lick_choice}")
+        lick_choice = wait_for_lickometer([enable_lickometer])
+        print(f"licked at {lick_choice} while {enable_lickometer} was enabled")
+
         if lick_choice is not None:  # subject did respond
-            if grating[lick_choice].ori != orientation['target']:
+            if grating[lick_choice].ori != orientation['target'] or lick_choice != enable_lickometer:
                 punish()
-                messages['post'].text = f"Beeee! Wrong choice. Hit any key or q to exit"
-                staircase.addResponse(0)
+                if lick_choice != enable_lickometer:
+                    if messages:
+                        messages['post'].text = f"Oups, you landed on one side and lickometer on the other side? Hit any key or q to exit"
+                        core.wait(1)
+                    # ignore this trial
+                    continue
+                else:
+                    if messages: messages['post'].text = f"Beeee! Wrong choice. Hit any key or q to exit"
+                    staircase.addResponse(0)
             else:
                 deliver_reward()
-                messages['post'].text = f"Yipie! Correct choice. Hit any key or q to exit"
+                if messages: messages['post'].text = f"Yipie! Correct choice. Hit any key or q to exit"
                 staircase.addResponse(1)
             dataFile.write(f"{orientation['target']},{thisIncrement}, {grating[lick_choice].ori}")
         print(f"left:{grating['left'].ori} right:{grating['right'].ori}")
         # blank screen
         intertrial.draw()
-        messages['post'].draw()
+        if messages: messages['post'].draw()
         [win[sk1].flip() for sk1 in win.keys() if win[sk1] is not None]
         allKeys = event.waitKeys(maxWait=message_time)
         if allKeys is not None and 'q' in allKeys:
@@ -213,4 +257,4 @@ def run_trial():
 
 
 if __name__ == '__main__':
-    run_trial()
+    run_staircase()
