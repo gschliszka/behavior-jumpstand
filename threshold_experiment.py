@@ -1,11 +1,13 @@
 '''Decrease motion duration while teaching animal to discriminate vertical vs horizontal orientation.
 This code assumes animal knows lickometer and jump stand.
 '''
+import time
+
 from psychopy import prefs
 import pyglet
 prefs.general['winType']=pyglet
 prefs.validate()
-from psychopy import core, visual, gui, data, event, sound
+from psychopy import core, visual, gui, data, event, sound, monitors
 from psychopy.tools.filetools import fromFile, toFile
 import numpy
 import random
@@ -16,24 +18,47 @@ try:
     trialtext = ''
 except:
     lickemu = 1
-lickemu = 1
+# lickemu = 1
 
 if lickemu:
     print('emulation mode')
-    win_size = {'height': 600, 'width': 800}
+    win_size = {'height': 600, 'width': 600}
     # split single screen in half
     grating_size = {gk1: 20 for gk1 in ['left', 'right']}
-    grating_pos = {'left': (-5,0), 'right': (5,0)}
+    grating_pos = {'left': (0,0), 'right': (0,0)}
+    win_pos = {'left': (0, 10), 'right': (800, 10)}
     feedback_sound = {'reward': sound.Sound('A'), 'punish': sound.Sound('pinknoise.wav', stopTime=1)}
     trialtext = 'Hit left key if you think correct pattern is shown on the left side; right key if correct pattern is on right side.'
+
+if not lickemu:
+    print('real mode')
+    win_size = {'height': 600, 'width': 600}
+    # split single screen in half
+    grating_size = {gk1: 20 for gk1 in ['left', 'right']}
+    grating_pos = {'left': (0,0), 'right': (0,0)}
+    win_pos = {'left': (0, 10), 'right': (800, 10)}
+    feedback_sound = {'reward': sound.Sound('A'), 'punish': sound.Sound('pinknoise.wav', stopTime=1)}
+    trialtext = 'Hit left key if you think correct pattern is shown on the left side; right key if correct pattern is on right side.'
+    try:
+        lick_o_meter = lickometer.Protocol()
+    except:
+        print('No lickometer found, quit')
+        core.quit()
+
 
 def punish():
     feedback_sound['punish'].stop()
     feedback_sound['punish'].play()
+    if not lickemu:
+        lick_o_meter.punish()
 
-def deliver_reward():
+
+def deliver_reward(side: str):
     feedback_sound['reward'].stop()
     feedback_sound['reward'].play()
+    if not lickemu:
+        lick_o_meter.reward(side)
+
 
 def wait_for_lickometer(enabled_lickometers:list, timeout=float('inf')):
     '''
@@ -68,7 +93,16 @@ def wait_for_lickometer(enabled_lickometers:list, timeout=float('inf')):
     else:
         # TODO: Gazsi please complete
         # if cat licks into non-valid lickometers, give punishment
-        return lickometer.lick(timeout)
+        licks = lick_o_meter.watch_licks(enabled_lickometers[0])
+        if licks == '100':
+            return 'up'
+        elif licks == '010':
+            return 'left'
+        elif licks == '001':
+            return 'right'
+        else:
+            return None
+
 
 def random_swap(previous:dict):
     """
@@ -89,12 +123,16 @@ def random_swap(previous:dict):
         previous[dkeys[1]].ori = r_temp
     return previous
 
+
 def iterate_motion_time_grating_2afc(win, grating, mouse, messages, message_time, trial_clock, motion_time, timeout_time):
     if messages: messages['pre'].draw()
     [win[sk1].flip() for sk1 in win.keys() if win[sk1] is not None]
     core.wait(message_time)
     # keep screens blank until subject licks into lickometer on the stand
     entry_response = wait_for_lickometer(['up'])
+    if not lickemu and entry_response == 'up':
+        lick_o_meter.reward('up')
+    print(f"licked at {entry_response}, entry response")
 
     # animal licked into stand-lickometer: show stimulus
     # set orientation of gratings on two screens
@@ -114,11 +152,14 @@ def iterate_motion_time_grating_2afc(win, grating, mouse, messages, message_time
                 grating[sk].phase = numpy.mod(trial_clock.getTime(), 1)
             grating[sk].draw()
             mpress = [mouse[k1].isPressedIn(grating[k1]) for k1 in grating.keys()]
+            time.sleep(0.01)
+            # mouse[sk].isPressedIn(grating[sk])
             if any(mpress):
                 break
         [win[sk1].flip() for sk1 in win.keys() if win[sk1] is not None]
 
     return mpress, trial_clock.getTime()  # [True False] if first screen chosen
+
 
 def init_experiment(motion):
 
@@ -141,6 +182,7 @@ def init_experiment(motion):
     dataFile.write('targetSide,oriIncrement,correct\n')
     return expInfo, dataFile, fileName
 
+
 def init_stimulus(show_messages=False):
     # Parameters
     motion = {'duration_max_s': 3, 'speed_cycles_per_second': 0.5}
@@ -150,13 +192,19 @@ def init_stimulus(show_messages=False):
     orientation = {'target': 0, 'alternative': 90}  # target is rewarded, alternative is not rewarded
 
     # create window and stimuli
+    # TODO : monitor objects?
     if lickemu:
-        win = {sk1: visual.Window([win_size['width'], win_size['height']], allowGUI=True, screen=si1,
-                                  monitor='testMonitor', units='deg') for si1, sk1 in
+        mon = monitors.Monitor('Samsung_LE40C530', distance=40, width=47.0, currentCalib={'sizePix': (1920, 1080)})
+        win = {sk1: visual.Window([win_size['width'], win_size['height']], allowGUI=True, screen=0,
+                                  monitor=mon, units='deg', pos=win_pos[sk1]) for si1, sk1 in
                enumerate(grating_size.keys())}  # emulation mode on single screen
         mouse = {wk1: event.Mouse(win=win[wk1]) for wk1 in win.keys()}
     else:
-        raise NotImplementedError('add creation of two windows')
+        win = {sk1: visual.Window([win_size['width'], win_size['height']], allowGUI=True, screen=0,
+                                  monitor='testMonitor', units='deg', pos=win_pos[sk1]) for si1, sk1 in
+               enumerate(grating_size.keys())}  # fullscr=True: use only if you have 3 screens or working q event!
+        mouse = {wk1: event.Mouse(win=win[wk1]) for wk1 in win.keys()}
+        # raise NotImplementedError('add creation of two windows')
 
     sk = ['left', 'right']  # screen keys
     grating = {sk1: visual.GratingStim(win[sk1], sf=sf, size=grating_size[sk1], pos=grating_pos[sk1], mask='gauss',
@@ -181,6 +229,7 @@ def init_stimulus(show_messages=False):
     message_time = 1.5
     return win, grating, mouse, messages, message_time, intertrial, trial_clock, motion, orientation, timeout_time
 
+
 def run_staircase():
     win, grating, mouse, messages, message_time, intertrial, trial_clock, motion, orientation, timeout_time = init_stimulus(show_messages=True)
     expInfo, dataFile, fileName = init_experiment(motion)
@@ -190,7 +239,6 @@ def run_staircase():
                               stepType = 'db', stepSize=[8,4,2], minVal=0.1,
                               nUp=1, nDown=3,  # will home in on the 80% threshold
                               nTrials=1, nReversals=2)
-
 
     for thisIncrement in staircase:  # will continue the staircase until it terminates!
 
@@ -222,7 +270,7 @@ def run_staircase():
                     if messages: messages['post'].text = f"Beeee! Wrong choice. Hit any key or q to exit"
                     staircase.addResponse(0)
             else:
-                deliver_reward()
+                deliver_reward(lick_choice)
                 if messages: messages['post'].text = f"Yipie! Correct choice. Hit any key or q to exit"
                 staircase.addResponse(1)
             dataFile.write(f"{orientation['target']},{thisIncrement}, {grating[lick_choice].ori}")

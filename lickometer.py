@@ -46,6 +46,8 @@ class Protocol(Arduino):
         super(Protocol, self).__init__(rate, timeout)
         self.version = self.read_line()
         self.initial_values = self.read_line()
+        self.command = {i.name.lower(): i for i in self.Order}
+        self.printing = False
 
     class Order(Enum):
         """
@@ -54,15 +56,15 @@ class Protocol(Arduino):
         # states
         OFF = 0
         CAT = 1
-        RPI = 2
-        RAC = 3
-
-        REW = 10
-        NOR = 11
+        STM = 2
+        WFL = 3
+        NOR = 4
+        REW = 5
 
         SIDE = 20
         LEFT = 21
         RIGHT = 22
+        UP = 23
 
         # control
         INVALID_ORDER = 90
@@ -70,6 +72,31 @@ class Protocol(Arduino):
         DONE = 92
 
         NONE = 100
+
+    def watch_licks(self, side: str):
+        self.write_order(self.Order.SIDE)
+        self.write_order(self.command[side])
+        result = self.read_line()
+        if self.printing: print(f'-->Lickometer.watch(side): {result}')
+        self.write_order(self.Order.WFL)
+        result2 = self.read_line()
+        if self.printing: print(f'->Lickometer.watch(state): {result2}')
+        return self.read_line()
+
+    def reward(self, side: str):
+        self.write_order(self.Order.SIDE)
+        self.write_order(self.command[side])
+        result = self.read_line()
+        if self.printing: print(f'-->Lickometer.reward(side): {result}')
+        self.write_order(self.Order.REW)
+        result2 = self.read_line()
+        if self.printing: print(f'->Lickometer.reward(state): {result2}')
+        return self.read_line()
+
+    def punish(self):
+        self.write_order(self.Order.NOR)
+        result = self.read_line()
+        if self.printing: print(f'-->Lickometer.punish: {result}')
 
     def read_order(self):
         """
