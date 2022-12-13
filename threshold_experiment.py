@@ -58,9 +58,12 @@ def wait_for_lickometer(enabled_lickometers:list, timeout=float('inf')):
             if any([k2 not in enabled_lickometers for k2 in key]):
                 # punish if subject activates wrong (not enabled) lickometer
                 punish()
+                print(f'wrong: {key[-1]}')
                 return key[-1]  # since it was a lick, return it
+            print('none key detected')
             return  # there was no lick, timeout
         event.clearEvents()
+        print(f'good: {key[-1]}')
         return key[-1]
     else:
         # TODO: Gazsi please complete
@@ -179,7 +182,7 @@ def init_stimulus(show_messages=False):
     return win, grating, mouse, messages, message_time, intertrial, trial_clock, motion, orientation, timeout_time
 
 def run_staircase():
-    win, grating, mouse, messages, message_time, intertrial, trial_clock, motion, orientation, timeout_time = init_stimulus()
+    win, grating, mouse, messages, message_time, intertrial, trial_clock, motion, orientation, timeout_time = init_stimulus(show_messages=True)
     expInfo, dataFile, fileName = init_experiment(motion)
 
     # create the staircase handler
@@ -195,7 +198,8 @@ def run_staircase():
 
         if choice_time_s >= timeout_time:
             punish()
-            if messages: messages['post'].text = f"Timeout, make your choice faster"
+            if messages:
+                messages['post'].text = f"Timeout, make your choice faster"
             core.wait(1)
             continue
 
@@ -258,3 +262,4 @@ def run_staircase():
 
 if __name__ == '__main__':
     run_staircase()
+
