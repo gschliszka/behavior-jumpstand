@@ -175,17 +175,21 @@ def iterate_motion_time_grating_2afc(win, grating, mouse, messages, time_dict, t
     # show moving grating on both screens
     trial_clock.reset()
     mpress = [0,0]
-    while (trial_clock.getTime() < time_dict['jump_timeout']) and not any(mpress):
+    ctime = trial_clock.getTime()
+    while (ctime < time_dict['jump_timeout']) and not any(mpress):
         for sk in grating.keys():
             # move grating until specified time then leave last grating phase constant until timeout time
             if trial_clock.getTime() < time_dict['motion']:
                 grating[sk].phase = numpy.mod(trial_clock.getTime(), 1)
             grating[sk].draw()
             mpress = [mouse[k1].isPressedIn(grating[k1]) for k1 in grating.keys()]
+            if all(mpress):
+                breakpoint()
             time.sleep(0.01)
             # mouse[sk].isPressedIn(grating[sk])
             if any(mpress):
                 break
+        ctime = trial_clock.getTime()
         [win[sk1].flip() for sk1 in win.keys() if win[sk1] is not None]
 
     return mpress, trial_clock.getTime()  # [True False] if first screen chosen
@@ -252,13 +256,15 @@ def run_staircase(show_messages=False, up_steps=1, down_steps=3):
 
     # create the staircase handler
     staircase = data.StairHandler(startVal = motion['duration_max_s'],
-                              stepType = 'db', stepSize=[8,4,2], minVal=0.1,
+                              stepType = 'db', stepSize=8, minVal=0,
                               nUp=up_steps, nDown=down_steps,  # will home in on the 80% threshold
-                              nTrials=1, nReversals=2)
+                              nTrials=3, # nTrials means at least this many time the parameter will change even if all responses are correct
+                              nReversals=2)
 
     for thisIncrement in staircase:  # will continue the staircase until it terminates!
         # Show stimulus and let subject make a choice (mouse/touch screen response)
         time_dict['motion'] = thisIncrement
+        print(f"trial {len(staircase.data)}, motion time: {thisIncrement}, staircase trial {staircase.thisTrialN} reversals {len(staircase.reversalIntensities)}")
         result = None  # initialize to non-defined so that staircase is updated only after checking all possible outcomes
         mouse_choice, choice_time_s = iterate_motion_time_grating_2afc(win, grating, mouse, messages, time_dict, trial_clock)
 
@@ -271,6 +277,7 @@ def run_staircase(show_messages=False, up_steps=1, down_steps=3):
             continue
 
         print(f"mouse clicked {mouse_choice}")
+
         jump_choice = 'left' if mouse_choice[0] else 'right'
         # Provide bridge reward for correct mouse click/touchscreen choice
         if grating[jump_choice].ori != orientation['target']:
@@ -344,7 +351,7 @@ def run_staircase(show_messages=False, up_steps=1, down_steps=3):
 if __name__ == '__main__':
     # teaching task:
     # level 1: no waiting time enforced after licking 'up' (lickometer on the jump stand)
-    train_basic_task = True
+    train_basic_task = False
     n_down = 6 if train_basic_task else 3
     n_up = 2 if train_basic_task else 1
     run_staircase(show_messages=True, up_steps=n_up, down_steps=n_down)
