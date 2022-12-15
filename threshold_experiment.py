@@ -1,7 +1,6 @@
 '''Decrease motion duration while teaching animal to discriminate vertical vs horizontal orientation.
 This code assumes animal knows lickometer and jump stand.
 '''
-import pdb
 import time
 import uuid
 from psychopy import sound, monitors
@@ -18,7 +17,7 @@ try:
     trialtext = ''
 except:
     lickemu = 1
-# lickemu = 1
+lickemu = 1
 computer = uuid.getnode()
 print(f"Running on computer with mac address: {computer}")
 if computer == 1:
@@ -31,7 +30,8 @@ elif computer == 93181002139480:
     # set screen_id so that left screen is physically on the left side
     screen_ids = (1, 0)
 else:
-    mon = monitors.Monitor('testmonitor')
+    # Gazsi added monitor_params
+    monitor_params = {'distance_cm': 40}
     screen_ids = (0, 0) if len(detected_monitors) == 1 else (1, 0)
 mon={}
 for i1, k1 in zip(range(len(detected_monitors)), ['left','right']):
@@ -288,6 +288,7 @@ def run_staircase(show_messages=False, up_steps=1, down_steps=3):
             # if wrong choice, no need to wait for lickometer
             punish()
             result = 0
+            print(f'\t>>> jumped on wrong side, mouse_clicked --> jump_choice = {mouse_choice} --> {jump_choice}')
         else: # jumped to correct side
             bridge_reward()
             lick_choice = wait_for_lickometer([jump_choice], time_dict['lick_timeout'])  # now has to lick at same side
@@ -324,7 +325,7 @@ def run_staircase(show_messages=False, up_steps=1, down_steps=3):
         # blank screen
         [intertrial[sk1].draw() for sk1 in intertrial]
         if messages: messages['post'].draw()
-        [win[sk1].flip() for sk1 in win.keys()]
+        [w.flip() for w in win]
         allKeys = event.waitKeys(maxWait=time_dict['message'])
         if allKeys is not None and 'q' in allKeys:
             print('user abort')
@@ -348,7 +349,7 @@ def run_staircase(show_messages=False, up_steps=1, down_steps=3):
 
     win['left'].flip()
     core.wait(1)
-    [win[sk1].close() for sk1 in win]
+    [w.close() for w in win]
     core.quit()
 
 
