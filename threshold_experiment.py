@@ -1,7 +1,7 @@
 '''Decrease motion duration while teaching animal to discriminate vertical vs horizontal orientation.
 This code assumes animal knows lickometer and jump stand.
 '''
-import pdb
+# import pdb
 import time
 import uuid
 from psychopy import sound, monitors
@@ -18,7 +18,7 @@ try:
     trialtext = ''
 except:
     lickemu = 1
-# lickemu = 1
+lickemu = 1
 computer = uuid.getnode()
 print(f"Running on computer with mac address: {computer}")
 if computer == 1:
@@ -32,6 +32,8 @@ elif computer == 93181002139480:
     screen_ids = (1, 0)
 else:
     mon = monitors.Monitor('testmonitor')
+    # Gazsi added monitor_params
+    monitor_params = {'distance_cm': 40}
     screen_ids = (0, 0) if len(detected_monitors) == 1 else (1, 0)
 mon={}
 for i1, k1 in zip(range(len(detected_monitors)), ['left','right']):
@@ -54,6 +56,7 @@ else:
     grating_pos = {'left': (0,0), 'right': (0,0)}
     win_pos = {'left': (0, 10), 'right': (800, 10)}
     trialtext = 'Hit left key if you think correct pattern is shown on the left side; right key if correct pattern is on right side.'
+
 feedback_sound = {'reward': sound.Sound('mixkit-gaming-lock-2848.wav'), 'punish': sound.Sound('pinknoise.wav', stopTime=0.6)}
 
 from psychopy import core, visual, gui, data, event
@@ -184,7 +187,8 @@ def iterate_motion_time_grating_2afc(win, grating, mouse, messages, time_dict, t
             grating[sk].draw()
             mpress = [mouse[k1].isPressedIn(grating[k1]) for k1 in grating.keys()]
             if all(mpress):
-                breakpoint()
+                print(mpress)
+                #breakpoint()
             time.sleep(0.01)
             # mouse[sk].isPressedIn(grating[sk])
             if any(mpress):
@@ -277,13 +281,16 @@ def run_staircase(show_messages=False, up_steps=1, down_steps=3):
             continue
 
         print(f"mouse clicked {mouse_choice}")
-
-        jump_choice = 'left' if mouse_choice[0] else 'right'
+        # TODO : I tried to bypass the bug by using mouse_choice[1]. Result: not perfect, less error but sometimes error
+        # TODO : sometimes not when switch from right to left  -->  isPressedIn must be further investigate
+        # jump_choice = 'left' if mouse_choice[0] else 'right'
+        jump_choice = 'right' if mouse_choice[1] else 'left'
         # Provide bridge reward for correct mouse click/touchscreen choice
         if grating[jump_choice].ori != orientation['target']:
             # if wrong choice, no need to wait for lickometer
             punish()
             result = 0
+            print(f'\t>>> jumped on wrong side, mouse_clicked --> jump_choice = {mouse_choice} --> {jump_choice}')
         else: # jumped to correct side
             bridge_reward()
             lick_choice = wait_for_lickometer([jump_choice], time_dict['lick_timeout'])  # now has to lick at same side
@@ -291,6 +298,7 @@ def run_staircase(show_messages=False, up_steps=1, down_steps=3):
 
             # evaluate lick response
             if lick_choice is not None:
+            # TODO : in grating? not in grating.keys?
                 if lick_choice not in grating:  # this should not happen, can happen in emulation mode when user clicks a non-valid response key
                     punish()
                     continue
@@ -320,6 +328,7 @@ def run_staircase(show_messages=False, up_steps=1, down_steps=3):
         # blank screen
         [intertrial[sk1].draw() for sk1 in intertrial]
         if messages: messages['post'].draw()
+        # TODO : should be more readable: [w.flip() for w in win]
         [win[sk1].flip() for sk1 in win.keys()]
         allKeys = event.waitKeys(maxWait=time_dict['message'])
         if allKeys is not None and 'q' in allKeys:
@@ -344,6 +353,7 @@ def run_staircase(show_messages=False, up_steps=1, down_steps=3):
 
     win['left'].flip()
     core.wait(1)
+    # TODO : also more readable: [w.close() for w in win]
     [win[sk1].close() for sk1 in win]
     core.quit()
 
