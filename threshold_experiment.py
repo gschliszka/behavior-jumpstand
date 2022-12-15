@@ -182,11 +182,15 @@ def iterate_motion_time_grating_2afc(win, grating, mouse, messages, time_dict, t
             if trial_clock.getTime() < time_dict['motion']:
                 grating[sk].phase = numpy.mod(trial_clock.getTime(), 1)
             grating[sk].draw()
+            mpos1 = [mouse[k1].getPos() for k1 in grating.keys()]
             mpress = [mouse[k1].isPressedIn(grating[k1]) for k1 in grating.keys()]
+            mpos2 = [mouse[k1].getPos() for k1 in grating.keys()]
+            if all(mpress):  # simply check if coordinates remained the same
+                mpress[0] = 0
+                print(f"dirty hack correcting mouse press to report only right screen")
+            time.sleep(0.01)
             if all(mpress):
                 breakpoint()
-            time.sleep(0.01)
-            # mouse[sk].isPressedIn(grating[sk])
             if any(mpress):
                 break
         ctime = trial_clock.getTime()
@@ -259,7 +263,7 @@ def run_staircase(show_messages=False, up_steps=1, down_steps=3):
                               stepType = 'db', stepSize=8, minVal=0,
                               nUp=up_steps, nDown=down_steps,  # will home in on the 80% threshold
                               nTrials=3, # nTrials means at least this many time the parameter will change even if all responses are correct
-                              nReversals=2)
+                              nReversals=3)
 
     for thisIncrement in staircase:  # will continue the staircase until it terminates!
         # Show stimulus and let subject make a choice (mouse/touch screen response)
