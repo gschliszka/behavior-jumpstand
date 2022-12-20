@@ -50,6 +50,10 @@ class TwoAFC:
             monitor_params = {'distance_cm': 40}
             # set screen_id so that left screen is physically on the left side
             screen_ids = (1, 0)
+        elif computer == 220292358129433:
+            # Gazsi's laptop
+            monitor_params = {'distance_cm': 40}
+            screen_ids = (1, 2)
         else:
             # Gazsi added monitor_params
             monitor_params = {'distance_cm': 40}
@@ -75,6 +79,7 @@ class TwoAFC:
             }
         monitor_pixelsize = detected_monitors[0].width_mm/detected_monitors[0].width  # mm
         grating_size_deg = numpy.arctan(detected_monitors[0].width_mm/10/2 / monitor_params['distance_cm'])
+        print(detected_monitors)
 
         # half pixel is viewed in right angled triangle -> multiply by 2 at the end to get visual degree for a full pixel
         one_pixel_in_visual_degrees = numpy.arctan(monitor_pixelsize/2/monitor_params['distance_cm']/10) * 180/numpy.pi * 2
@@ -133,6 +138,9 @@ class TwoAFC:
             print(f"started! {tc.getTime()}")
             key = event.waitKeys(maxWait=timeout, clearEvents=True)  # wait for participant to respond
             print(f"Got {key}, timeout {timeout}")
+            if key is not None and 'q' in key:
+                print("'q' key detected, quit")
+                core.quit()
             event.clearEvents()
 
             # no key hit (timeout)
@@ -186,6 +194,8 @@ class TwoAFC:
         trial_clock.reset()
         mpress = [0,0]
         ctime = trial_clock.getTime()
+        mouse_loc = [self.mouse[k1].getPos() for k1 in grating.keys()]
+        print(mouse_loc)
         while (ctime < time_dict['jump_timeout']) and not any(mpress):
             for sk in grating.keys():
                 # move grating until specified time then leave last grating phase constant until timeout time
@@ -194,9 +204,20 @@ class TwoAFC:
                 grating[sk].draw()
 
                 sys.modules['debugmp']=None
-                mpos1 = [self.mouse[k1].getPos() for k1 in grating.keys()]
-                mpress = [self.mouse[k1].isPressedIn(grating[k1]) for k1 in grating.keys()]
-                mpos2 = [self.mouse[k1].getPos() for k1 in grating.keys()]
+                # mpos1 = [self.mouse[k1].getPos() for k1 in grating.keys()]
+                mouse_pos = [self.mouse[k1].getPos() for k1 in grating.keys()]
+                if all([(mouse_pos[i] == mouse_loc[i]).all() for i in range(len(mouse_pos))]):
+                    pass
+                else:
+                    stim_contain = [grating[k1].contains(self.mouse[k1]) for k1 in grating.keys()]
+                    # print(stim_contain)
+                    if all(stim_contain):
+                        print(f"both stimulus touched")
+                    if any(stim_contain):
+                        mpress = stim_contain
+                        break
+                # mpress = [self.mouse[k1].isPressedIn(grating[k1]) for k1 in grating.keys()]
+                # mpos2 = [self.mouse[k1].getPos() for k1 in grating.keys()]
                 if all(mpress):  # simply check if coordinates remained the same
 
                     sys.modules['debugmp'] = [mpos1, mpos2, grating.values()]
