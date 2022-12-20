@@ -25,8 +25,9 @@ def debughook(etype, value, tb):
 sys.excepthook = debughook
 
 class TwoAFC:
-    def __init__(self, lickemu, show_messages=False, windowed=None):
+    def __init__(self, lickemu, touchscreen=False, show_messages=False, windowed=None):
         self.lickemu = lickemu
+        self.touchsc = touchscreen
         self.show_messages = show_messages
         self.windowed = windowed
         self.init_environment()
@@ -204,30 +205,33 @@ class TwoAFC:
                 grating[sk].draw()
 
                 sys.modules['debugmp']=None
-                # mpos1 = [self.mouse[k1].getPos() for k1 in grating.keys()]
-                mouse_pos = [self.mouse[k1].getPos() for k1 in grating.keys()]
-                if all([(mouse_pos[i] == mouse_loc[i]).all() for i in range(len(mouse_pos))]):
-                    pass
+
+                if self.touchsc:
+                    mouse_pos = [self.mouse[k1].getPos() for k1 in grating.keys()]
+                    if all([(mouse_pos[i] == mouse_loc[i]).all() for i in range(len(mouse_pos))]):
+                        pass
+                    else:
+                        stim_contain = [grating[k1].contains(self.mouse[k1]) for k1 in grating.keys()]
+                        # print(stim_contain)
+                        if all(stim_contain):
+                            print(f"both stimulus touched")
+                        if any(stim_contain):
+                            mpress = stim_contain
+                            break
                 else:
-                    stim_contain = [grating[k1].contains(self.mouse[k1]) for k1 in grating.keys()]
-                    # print(stim_contain)
-                    if all(stim_contain):
-                        print(f"both stimulus touched")
-                    if any(stim_contain):
-                        mpress = stim_contain
+                    # mpos1 = [self.mouse[k1].getPos() for k1 in grating.keys()]
+                    mpress = [self.mouse[k1].isPressedIn(grating[k1]) for k1 in grating.keys()]
+                    # mpos2 = [self.mouse[k1].getPos() for k1 in grating.keys()]
+                    if all(mpress):  # simply check if coordinates remained the same
+
+                        sys.modules['debugmp'] = [mpos1, mpos2, grating.values()]
+                        print(sys.modules['debugmp'])
+
+                        k1 = list(grating.keys())[1]
+                        print(self.mouse[k1].isPressedIn(grating[k1]))
+                    time.sleep(0.01)
+                    if any(mpress):
                         break
-                # mpress = [self.mouse[k1].isPressedIn(grating[k1]) for k1 in grating.keys()]
-                # mpos2 = [self.mouse[k1].getPos() for k1 in grating.keys()]
-                if all(mpress):  # simply check if coordinates remained the same
-
-                    sys.modules['debugmp'] = [mpos1, mpos2, grating.values()]
-                    print(sys.modules['debugmp'])
-
-                    k1 = list(grating.keys())[1]
-                    print(self.mouse[k1].isPressedIn(grating[k1]))
-                time.sleep(0.01)
-                if any(mpress):
-                    break
             ctime = trial_clock.getTime()
             [self.win[sk1].flip() for sk1 in self.win.keys() if self.win[sk1] is not None]
     
@@ -426,7 +430,7 @@ if __name__ == '__main__':
     train_basic_task = False
     n_down = 6 if train_basic_task else 3
     n_up = 2 if train_basic_task else 1
-    experiment = TwoAFC(lickemu=lickemu, show_messages=False, windowed = args.windowed)
+    experiment = TwoAFC(lickemu=lickemu, touchscreen=True, show_messages=False, windowed = args.windowed)
     stair_params = {'up_steps': n_up, 'down_steps': n_down}
     experiment.run_staircase(**stair_params)
 
