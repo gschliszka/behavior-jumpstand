@@ -74,11 +74,15 @@ class TwoAFC:
         else:
             print('fullscreen mode')
             self.window_p = {
-                'size': {mk: getattr(detected_monitors[i1], mk) for mk in ['height', 'width']},
+                'size': {mk: getattr(detected_monitors[-1], mk) for mk in ['height', 'width']},
                 'pos': {'left': (0, 0), 'right': (0, 0)},
                 'unit': 'pix'
             }
-        monitor_pixelsize = detected_monitors[0].width_mm/detected_monitors[0].width  # mm
+        if computer == 220292358129433:
+            # my laptop monitor is much smaller then externals
+            monitor_pixelsize = detected_monitors[1].width_mm / detected_monitors[1].width  # mm
+        else:
+            monitor_pixelsize = detected_monitors[0].width_mm/detected_monitors[0].width  # mm
         grating_size_deg = numpy.arctan(detected_monitors[0].width_mm/10/2 / monitor_params['distance_cm'])
         print(detected_monitors)
 
@@ -88,7 +92,7 @@ class TwoAFC:
         grating_period_in_visual_degrees = 20 # spatial frequency in visual degrees
         grating_period_in_pixels = grating_period_in_visual_degrees/one_pixel_in_visual_degrees
         self.grating_p = {
-            'size': {gk1: self.window_p['size']['height'] for gk1 in ['left', 'right']},
+            'size': {gk1: [self.window_p['size']['height'], self.window_p['size']['width']] for gk1 in ['left', 'right']},
             'pos': {'left': (0, 0), 'right': (0, 0)},
             'spatial_freq_deg_per_pix': grating_period_in_pixels,
             'speed_Hz': 7.5,   # how many periods pass in a second
@@ -195,6 +199,7 @@ class TwoAFC:
         trial_clock.reset()
         mpress = [0,0]
         ctime = trial_clock.getTime()
+        [self.mouse[k1].getPos() for k1 in self.mouse.keys()]
         mouse_loc = [self.mouse[k1].getPos() for k1 in grating.keys()]
         print(mouse_loc)
         while (ctime < time_dict['jump_timeout']) and not any(mpress):
@@ -215,13 +220,22 @@ class TwoAFC:
                         # print(stim_contain)
                         if all(stim_contain):
                             print(f"both stimulus touched")
+                            sys.modules['debugmp'] = [mouse_pos[0], mouse_pos[1], grating.values()]
+                            print(sys.modules['debugmp'])
+
+                            k1 = list(grating.keys())[1]
+                            [self.mouse[k1].setPos([-900, 0]) for k1 in grating.keys()]
+                            stim_contain = [grating[k1].contains(self.mouse[k1]) for k1 in grating.keys()]
+                            continue
                         if any(stim_contain):
                             mpress = stim_contain
+                            # move mice out of grating stimuli
+                            [self.mouse[k1].setPos([-900, 0]) for k1 in grating.keys()]
                             break
                 else:
-                    # mpos1 = [self.mouse[k1].getPos() for k1 in grating.keys()]
+                    mpos1 = [self.mouse[k1].getPos() for k1 in grating.keys()]
                     mpress = [self.mouse[k1].isPressedIn(grating[k1]) for k1 in grating.keys()]
-                    # mpos2 = [self.mouse[k1].getPos() for k1 in grating.keys()]
+                    mpos2 = [self.mouse[k1].getPos() for k1 in grating.keys()]
                     if all(mpress):  # simply check if coordinates remained the same
 
                         sys.modules['debugmp'] = [mpos1, mpos2, grating.values()]
@@ -267,13 +281,16 @@ class TwoAFC:
                      'lick_timeout': 2}
     
         orientation = {'target': 0, 'alternative': 90}  # target is rewarded, alternative is not rewarded
-    
+
         grating = {sk1: visual.GratingStim(self.win[sk1], sf=self.grating_p['spatial_freq_deg_per_pix'], size=self.grating_p['size'][sk1], pos=self.grating_p['pos'][sk1], mask='gauss',
                                            ori=orientation[k1],) for k1, sk1 in zip(orientation.keys(), self.win.keys())}
         if not self.windowed:
             for sk1 in self.win.keys():
                 size1 = [ss1*0.1 for ss1 in self.win[sk1].size]
-                grating[sk1].setSize(size1, units='pix')
+                # size2: make stimulus size greater
+                min_size = min([ss1 for ss1 in self.win[sk1].size])
+                size2 = [min_size, min_size]
+                grating[sk1].setSize(size2, units='pix')
         from psychopy.tools.monitorunittools import posToPix
         ptxt = ' '.join([repr(posToPix(grating[gk1])) for gk1 in grating.keys()])
         print(f"grating positions {ptxt}")
@@ -430,7 +447,7 @@ if __name__ == '__main__':
     train_basic_task = False
     n_down = 6 if train_basic_task else 3
     n_up = 2 if train_basic_task else 1
-    experiment = TwoAFC(lickemu=lickemu, touchscreen=True, show_messages=False, windowed = args.windowed)
+    experiment = TwoAFC(lickemu=lickemu, touchscreen=True, show_messages=False, windowed=args.windowed)
     stair_params = {'up_steps': n_up, 'down_steps': n_down}
     experiment.run_staircase(**stair_params)
 
