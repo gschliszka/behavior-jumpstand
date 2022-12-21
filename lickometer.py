@@ -42,12 +42,12 @@ class Arduino:
 
 
 class Protocol(Arduino):
-    def __init__(self, rate=19200, timeout=10):
+    def __init__(self, rate=19200, timeout=1):
         super(Protocol, self).__init__(rate, timeout)
         self.version = self.read_line()
         self.initial_values = self.read_line()
         self.command = {i.name.lower(): i for i in self.Order}
-        self.printing = False
+        self.printing = True
 
     class Order(Enum):
         """
@@ -73,11 +73,7 @@ class Protocol(Arduino):
 
         NONE = 100
 
-    def watch_licks(self, side: str):
-        self.write_order(self.Order.SIDE)
-        self.write_order(self.command[side])
-        result = self.read_line()
-        if self.printing: print(f'-->Lickometer.watch(side): {result}')
+    def watch_licks(self):
         self.write_order(self.Order.WFL)
         result2 = self.read_line()
         if self.printing: print(f'->Lickometer.watch(state): {result2}')

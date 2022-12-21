@@ -27,6 +27,7 @@ sys.excepthook = debughook
 class TwoAFC:
     def __init__(self, lickemu, touchscreen=False, show_messages=False, windowed=None):
         self.lickemu = lickemu
+        print(self.lickemu)
         self.touchsc = touchscreen
         self.show_messages = show_messages
         self.windowed = windowed
@@ -40,6 +41,7 @@ class TwoAFC:
                 trialtext = ''
             except:
                 self.lickemu = 1
+        print(f'lickemu: {self.lickemu}')
         computer = uuid.getnode()
         print(f"Running on computer with mac address: {computer}")
         if computer == 1:
@@ -54,7 +56,7 @@ class TwoAFC:
         elif computer == 220292358129433:
             # Gazsi's laptop
             monitor_params = {'distance_cm': 40}
-            screen_ids = (1, 2)
+            screen_ids = (2, 1)
         else:
             # Gazsi added monitor_params
             monitor_params = {'distance_cm': 40}
@@ -136,7 +138,7 @@ class TwoAFC:
         -------
         str: which lickometer the subject was licking into
         '''
-        kopt = ['left', 'right', 'up']
+        kopt = ['up', 'left', 'right']
         print(f"Waiting for lick for {timeout} seconds")
         if self.lickemu:  # wait for mouse press
             tc = core.Clock()
@@ -166,15 +168,33 @@ class TwoAFC:
         else:
             # TODO: Gazsi are lickometers always enabled? If not some unexpected results can occur (e.g. experimenter forgets to wait until cat licks and puts back to stand
             # if cat licks into non-valid lickometers, give punishment
-            licks = self.lick_o_meter.watch_licks(enabled_lickometers[0])
-            if licks == '100':
+            tc = core.Clock()
+            print(f"started! {tc.getTime()}")
+            licks = self.lick_o_meter.watch_licks()
+            if licks in ['100', '010', '001']:
+                resp = kopt[licks.index('1')]
+            else:
+                resp = None
+            print(resp)
+
+            if resp is None:
+                print('no lickometer response (timeout)')
+                return  # there was no lick, timeout
+            if resp not in enabled_lickometers:
+                print(f'lickometer acitvated: {resp} but this lickometer was actually disabled!')
+                return resp  # since it was a lick, return it
+            else:
+                print(f'good: {resp}')
+                return resp
+
+            """if licks == '100':
                 return 'up'
             elif licks == '010':
                 return 'left'
             elif licks == '001':
                 return 'right'
             else:
-                return None
+                return None"""
 
     def iterate_motion_time_grating_2afc(self, grating, messages, time_dict, trial_clock):
         if messages: messages['pre'].draw()
@@ -438,7 +458,7 @@ if __name__ == '__main__':
         prog='MotionTrainer',
         description='2AFC training for cats',
         epilog='written by D Hillier, G Schliszka (c) 2022-2023')
-    parser.add_argument('--lickometer','-L', help='Use lickometers', action='store_true')
+    parser.add_argument('--lickometer','-L', help='Use lickometers', action='store_false')
     parser.add_argument('--windowed', '-W', help='Show stimulus in smaller window, not full screen.', action='store_true')
     args = parser.parse_args()
     lickemu = not args.lickometer #not args.lickometer
