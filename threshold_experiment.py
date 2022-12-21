@@ -44,10 +44,10 @@ class TwoAFC:
         print(f'lickemu: {self.lickemu}')
         computer = uuid.getnode()
         print(f"Running on computer with mac address: {computer}")
-        if computer == 1:
+        if computer == 101707888628436:
             # jump stand with two monitors
             monitor_params = {'distance_cm': 40}
-            screen_ids = (0, 0) if len(detected_monitors) == 1 else (1, 0)
+            screen_ids = (2, 1) # if len(detected_monitors) == 1 else (1, 0)
         elif computer == 93181002139480:
             # 2pgoe
             monitor_params = {'distance_cm': 40}
@@ -80,7 +80,7 @@ class TwoAFC:
                 'pos': {'left': (0, 0), 'right': (0, 0)},
                 'unit': 'pix'
             }
-        if computer == 220292358129433:
+        if computer == 220292358129433 or computer == 101707888628436:
             # my laptop monitor is much smaller then externals
             monitor_pixelsize = detected_monitors[1].width_mm / detected_monitors[1].width  # mm
         else:
@@ -166,7 +166,6 @@ class TwoAFC:
                 print(f'good: {key[-1]}')
                 return key[-1]
         else:
-            # TODO: Gazsi are lickometers always enabled? If not some unexpected results can occur (e.g. experimenter forgets to wait until cat licks and puts back to stand
             # if cat licks into non-valid lickometers, give punishment
             tc = core.Clock()
             print(f"started! {tc.getTime()}")
@@ -271,6 +270,22 @@ class TwoAFC:
     
         return mpress, trial_clock.getTime()  # [True False] if first screen chosen
 
+    def train_jumping(self, expected_trial_length_s):
+        trial_time_elapsed = numpy.inf
+        n_trials = 0
+        while trial_time_elapsed > expected_trial_length_s:
+            trialclock = core.Clock()
+            self.lick_o_meter.reward('up')   # deliver small reward to attract attention/lure animal to lickometer
+            entry_response = self.wait_for_lickometer(['up'])
+            if not self.lickemu and entry_response == 'up':
+                self.lick_o_meter.reward('up')
+            print(f"licked at {entry_response}, entry response")
+
+            # jump to any side and add reward with 80% contingency, 20% leads to silent omission (no sound, no reward)
+
+            n_trials += 1
+            trial_time_elapsed = trialclock.getTime()
+        return n_trials
 
     def init_output(self, motion):
     
