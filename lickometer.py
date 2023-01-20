@@ -7,10 +7,10 @@ from enum import Enum
 
 
 class Arduino:
-    def __init__(self, rate=19200, timeout=1):
+    def __init__(self, **kwargs):
         self.port = None
-        self.rate = rate
-        self.timeout = timeout
+        self.rate = kwargs.get('rate')
+        self.timeout = kwargs.get('timeout')
         self.serial = self.__connect()
         time.sleep(1)
 
@@ -41,9 +41,32 @@ class Arduino:
         print(f'Port {self.port} is closed')
 
 
-class Protocol(Arduino):
-    def __init__(self, rate=19200, timeout=1):
-        super(Protocol, self).__init__(rate, timeout)
+class RewardAmount:
+    ''' Handles reward size (small, big) and contingency (e.g. 80% of reward calls actually deliver the reward).
+    Both can change with time. '''
+
+    def __init__(self, **kwargs):
+        self.contingency_percent = kwargs.get('contingency_percent')
+        self.size = kwargs.get('size')
+        self.time_since_start = time.time()
+        self.history = []
+
+    @property
+    def current_size(self):
+        self.history.append(self.calculate_size())
+        return self.history[-1]
+
+    def calculate_size(self):
+        rewarded = [v1 > 0 for v1 in self.history]  # size can vary, get the occurrences of nonzero rewards
+        if len(rewarded) < len(self.history) * self.contingency_percent / 100:
+            return self.size
+        else:
+            return 0
+
+
+class Protocol(Arduino, RewardAmount):
+    def __init__(self, rate=19200, timeout=1, contingency_percent = 80, size=1):
+        super(Protocol, self).__init__(rate=rate, timeout=timeout, contingency_percent = contingency_percent, size = size)
         self.version = self.read_line()
         self.initial_values = self.read_line()
         self.command = {i.name.lower(): i for i in self.Order}
@@ -80,6 +103,8 @@ class Protocol(Arduino):
         return self.read_line()
 
     def reward(self, side: str):
+        size = self.current_size
+        # TODO: transmit size to arduino
         self.write_order(self.Order.SIDE)
         self.write_order(self.command[side])
         result = self.read_line()
@@ -180,6 +205,7 @@ class Protocol(Arduino):
             return self.Order.TIMEOUT, 0, -1
         else:
             return self.read_order(), self.read_i16(), self.read_i32()
+
 
 
 if __name__ == '__main__':

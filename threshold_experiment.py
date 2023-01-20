@@ -168,11 +168,11 @@ class TwoAFC:
         else:
             # if cat licks into non-valid lickometers, give punishment
             tc = core.Clock()
+            print(f"started! {tc.getTime()}")
+            licks = self.lick_o_meter.watch_licks()
             if event.getKeys(keyList=["escape"]):
                 print("'ESC' key detected, quit")
                 core.quit()
-            print(f"started! {tc.getTime()}")
-            licks = self.lick_o_meter.watch_licks()
             if licks in ['100', '010', '001']:
                 resp = kopt[licks.index('1')]
             else:
@@ -194,17 +194,17 @@ class TwoAFC:
         if messages: messages['pre'].draw()
         [self.win[sk1].flip() for sk1 in self.win.keys() if self.win[sk1] is not None]
         core.wait(time_dict['message'])
-    
+
         # keep screens blank until subject licks into lickometer on the stand
         entry_response = self.wait_for_lickometer(['up'])
         if not self.lickemu and entry_response == 'up':
             self.lick_o_meter.reward('up')
         print(f"licked at {entry_response}, entry response")
-    
+
         # animal licked into stand-lickometer: show stimulus
         # set orientation of gratings on two screens
         random_swap(grating)
-    
+
         # set duration of motion as the staircase sets the next value
         if messages: messages['trial'].draw()
         [self.win[sk1].flip() for sk1 in self.win.keys() if self.win[sk1] is not None]
@@ -285,22 +285,37 @@ class TwoAFC:
                         break"""
             ctime = trial_clock.getTime()
             [self.win[sk1].flip() for sk1 in self.win.keys() if self.win[sk1] is not None]
-    
+
         return mpress, trial_clock.getTime()  # [True False] if first screen chosen
 
-    def train_jumping(self, expected_trial_length_s):
+    def train_jumping(self, jump_within_s, enter_timeout_s):
+        ''' Training level: expect licking into upper lickometer, then jump within jump_within_s amount of time and get reward. '''
         trial_time_elapsed = numpy.inf
+        self.lick_o_meter.reward('up')  # deliver small reward to attract attention/lure animal to lickometer
+
         n_trials = 0
-        while trial_time_elapsed > expected_trial_length_s:
-            trialclock = core.Clock()
-            self.lick_o_meter.reward('up')   # deliver small reward to attract attention/lure animal to lickometer
-            entry_response = self.wait_for_lickometer(['up'])
+        entry_response = None
+        while entry_response is None:
+            entry_response = self.wait_for_lickometer(['up'], timeout=enter_timeout_s)
             if not self.lickemu and entry_response == 'up':
+                self.bridge_reward()
                 self.lick_o_meter.reward('up')
-            print(f"licked at {entry_response}, entry response")
+                print(f"licked at {entry_response}, entry response")
+            if entry_response is None:
+                self.punish()
 
-            # jump to any side and add reward with 80% contingency, 20% leads to silent omission (no sound, no reward)
+        # jump to striped side (other side is uniform gray) and add reward with 80% contingency, 20% leads to silent omission (no sound, no reward)
+        trialclock = core.Clock()
+        while trial_time_elapsed < jump_within_s:
+            # TODO: use same strucutre (wait for mouse click) with different stimulus
 
+            # one screen gray full field
+
+            # other screen
+
+            # add success trial if jumped within time, has to restart from 'up' lickometer
+
+            # add fail trial and punish if timeout, it has to restart from licking into the 'up' lickometer
             n_trials += 1
             trial_time_elapsed = trialclock.getTime()
         return n_trials
