@@ -110,8 +110,8 @@ class TwoAFC:
     def punish(self):
         self.feedback_sound['punish'].stop()
         self.feedback_sound['punish'].play()
-        if not self.lickemu:
-            self.lick_o_meter.punish()
+        # if not self.lickemu:
+        #     self.lick_o_meter.punish()
 
     def bridge_reward(self):
         """
@@ -168,6 +168,9 @@ class TwoAFC:
         else:
             # if cat licks into non-valid lickometers, give punishment
             tc = core.Clock()
+            if event.getKeys(keyList=["escape"]):
+                print("'ESC' key detected, quit")
+                core.quit()
             print(f"started! {tc.getTime()}")
             licks = self.lick_o_meter.watch_licks()
             if licks in ['100', '010', '001']:
@@ -186,14 +189,6 @@ class TwoAFC:
                 print(f'good: {resp}')
                 return resp
 
-            """if licks == '100':
-                return 'up'
-            elif licks == '010':
-                return 'left'
-            elif licks == '001':
-                return 'right'
-            else:
-                return None"""
 
     def iterate_motion_time_grating_2afc(self, grating, messages, time_dict, trial_clock):
         if messages: messages['pre'].draw()
@@ -252,6 +247,29 @@ class TwoAFC:
                             [self.mouse[k1].setPos([-900, 0]) for k1 in grating.keys()]
                             break
                 else:
+                    if any([any(self.mouse[k1].getPressed()) for k1 in grating.keys()]):
+                        mouse_pos = [self.mouse[k1].getPos() for k1 in grating.keys()]
+                        if all([(mouse_pos[i] == mouse_loc[i]).all() for i in range(len(mouse_pos))]):
+                            pass
+                        else:
+                            stim_contain = [grating[k1].contains(self.mouse[k1]) for k1 in grating.keys()]
+                            # print(stim_contain)
+                            if all(stim_contain):
+                                print(f"both stimulus touched")
+                                sys.modules['debugmp'] = [mouse_pos[0], mouse_pos[1], grating.values()]
+                                print(sys.modules['debugmp'])
+
+                                k1 = list(grating.keys())[1]
+                                [self.mouse[k1].setPos([-900, 0]) for k1 in grating.keys()]
+                                stim_contain = [grating[k1].contains(self.mouse[k1]) for k1 in grating.keys()]
+                                continue
+                            if any(stim_contain):
+                                mpress = stim_contain
+                                # move mice out of grating stimuli
+                                [self.mouse[k1].setPos([-900, 0]) for k1 in grating.keys()]
+                                break
+
+                    """
                     mpos1 = [self.mouse[k1].getPos() for k1 in grating.keys()]
                     mpress = [self.mouse[k1].isPressedIn(grating[k1]) for k1 in grating.keys()]
                     mpos2 = [self.mouse[k1].getPos() for k1 in grating.keys()]
@@ -264,7 +282,7 @@ class TwoAFC:
                         print(self.mouse[k1].isPressedIn(grating[k1]))
                     time.sleep(0.01)
                     if any(mpress):
-                        break
+                        break"""
             ctime = trial_clock.getTime()
             [self.win[sk1].flip() for sk1 in self.win.keys() if self.win[sk1] is not None]
     
