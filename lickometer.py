@@ -8,11 +8,14 @@ from enum import Enum
 
 class Arduino:
     def __init__(self, **kwargs):
+        print('Start __init__ of Arduino...')
+        super(Arduino, self).__init__(**kwargs)
         self.port = None
         self.rate = kwargs.get('rate')
         self.timeout = kwargs.get('timeout')
         self.serial = self.__connect()
         time.sleep(1)
+        print('End __init__ of Arduino')
 
     def __connect(self):
         com_ports = list_ports.comports()
@@ -46,10 +49,13 @@ class RewardAmount:
     Both can change with time. '''
 
     def __init__(self, **kwargs):
+        print('Start __init__ of RewardAmount...')
+        super(RewardAmount, self).__init__()
         self.contingency_percent = kwargs.get('contingency_percent')
         self.size = kwargs.get('size')
         self.time_since_start = time.time()
         self.history = []
+        print('End __init__ of RewardAmount')
 
     @property
     def current_size(self):
@@ -58,6 +64,8 @@ class RewardAmount:
 
     def calculate_size(self):
         rewarded = [v1 > 0 for v1 in self.history]  # size can vary, get the occurrences of nonzero rewards
+        print(f"rewarded: {rewarded}")
+        # print(f"len(self.history): {len(self.history)}\nself.contingency_percent: {self.contingency_percent}")
         if len(rewarded) < len(self.history) * self.contingency_percent / 100:
             return self.size
         else:
@@ -65,12 +73,14 @@ class RewardAmount:
 
 
 class Protocol(Arduino, RewardAmount):
-    def __init__(self, rate=19200, timeout=1, contingency_percent = 80, size=1):
-        super(Protocol, self).__init__(rate=rate, timeout=timeout, contingency_percent = contingency_percent, size = size)
+    def __init__(self, rate=19200, timeout=1, contingency_percent=80, size=1):
+        print('Start __init__ of Protocol...')
+        super(Protocol, self).__init__(rate=rate, timeout=timeout, contingency_percent=contingency_percent, size=size)
         self.version = self.read_line()
         self.initial_values = self.read_line()
         self.command = {i.name.lower(): i for i in self.Order}
-        self.printing = True
+        self.printing = False
+        print('End __init__ of Protocol')
 
     class Order(Enum):
         """

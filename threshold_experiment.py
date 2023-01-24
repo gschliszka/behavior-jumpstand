@@ -21,7 +21,7 @@ import traceback
 def debughook(etype, value, tb):
     traceback.print_exception(etype, value, tb)
     print() # make a new line before launching post-mortem
-    pdb.pm() # post-mortem debugger
+    # pdb.pm() # post-mortem debugger
 sys.excepthook = debughook
 
 class TwoAFC:
@@ -168,7 +168,9 @@ class TwoAFC:
         else:
             # if cat licks into non-valid lickometers, give punishment
             tc = core.Clock()
-            print(f"started! {tc.getTime()}")
+            # print(f"started! {tc.getTime()}")
+            # TODO: write function 'set_timeout' for Arduino and insert into the protocol --> implement inf case too
+
             licks = self.lick_o_meter.watch_licks()
             if event.getKeys(keyList=["escape"]):
                 print("'ESC' key detected, quit")
@@ -177,7 +179,7 @@ class TwoAFC:
                 resp = kopt[licks.index('1')]
             else:
                 resp = None
-            print(resp)
+            # print(resp)
 
             if resp is None:
                 print('no lickometer response (timeout)')
@@ -197,6 +199,7 @@ class TwoAFC:
 
         # keep screens blank until subject licks into lickometer on the stand
         entry_response = self.wait_for_lickometer(['up'])
+        # TODO: Arduino code changed! If timeout: entry_response = None --> set timeout = inf.
         if not self.lickemu and entry_response == 'up':
             self.lick_o_meter.reward('up')
         print(f"licked at {entry_response}, entry response")
@@ -290,11 +293,37 @@ class TwoAFC:
 
     def train_jumping(self, jump_within_s, enter_timeout_s):
         ''' Training level: expect licking into upper lickometer, then jump within jump_within_s amount of time and get reward. '''
-        trial_time_elapsed = numpy.inf
+        print("\n\tStarting train_jumping()...")
+        trial_time_elapsed = 0
+        jump_timeout_s = 10
+        """
+        if elapsed_time < jump_within_s:
+            reward()
+            end of train_jumping
+        if jump_within_s < elapsed_time < jump_timeout_s:
+            reward()
+            next trial (start by licking into 'up')
+        if elapsed_time > jump_timeout_s:
+            punish()
+            restart trial (without lickometer, just show stimuli)
+        """
+        win_keys = [sk1 for sk1 in self.win.keys()]
+        training_stimuli = {'gray': visual.GratingStim(self.win[win_keys[0]], sf=0, color=0, colorSpace='rgb',
+                                         size=self.win[win_keys[0]].size[0], tex=None),
+                            'grating': visual.GratingStim(self.win[win_keys[1]], sf=self.grating_p['spatial_freq_deg_per_pix'],
+                                            size=self.grating_p['size'][win_keys[1]], pos=self.grating_p['pos'][win_keys[1]],
+                                            mask='gauss', ori=0)}
+        t_stim = {'left': training_stimuli['gray'],
+                  'right': training_stimuli['grating']}
+
+        # TODO: write a function which changes the side of stimuli randomly (likle random_swap())
+        # --> use: ~ training_stimuli['gray'].win = self.win['right']
+
         self.lick_o_meter.reward('up')  # deliver small reward to attract attention/lure animal to lickometer
 
         n_trials = 0
         entry_response = None
+        print(f"\tEnter to 1st loop, iteration: {n_trials}.")
         while entry_response is None:
             entry_response = self.wait_for_lickometer(['up'], timeout=enter_timeout_s)
             if not self.lickemu and entry_response == 'up':
@@ -306,18 +335,85 @@ class TwoAFC:
 
         # jump to striped side (other side is uniform gray) and add reward with 80% contingency, 20% leads to silent omission (no sound, no reward)
         trialclock = core.Clock()
+        print("\tEnter to 2nd loop")
         while trial_time_elapsed < jump_within_s:
             # TODO: use same strucutre (wait for mouse click) with different stimulus
+            trialclock.reset()
+            m_press = [0, 0]
+            m_loc = [self.mouse[sk1].getPos() for sk1 in win_keys]
 
-            # one screen gray full field
+            # one screen gray full field, other screen: grating
+            [sv.draw() for sv in training_stimuli.values()]
+            [self.win[sk1].flip() for sk1 in self.win.keys() if self.win[sk1] is not None]
+            [self.mouse[k1].setPos([-900, 0]) for k1 in t_stim.keys()]
 
-            # other screen
+            # wait for touch on screens
+            print(f"Training loop, iteration: {n_trials}.")
+            while (trial_time_elapsed < jump_timeout_s) and not any(m_press):
+                m_press = [0, 0]
+                [self.mouse[k1].setPos([-900, 0]) for k1 in t_stim.keys()]
+                m_loc = [self.mouse[sk1].getPos() for sk1 in win_keys]
+                for sk in win_keys:
+                    # move grating (const or vibrate) until a specified time
+                    """if trialclock.getTime() < motion_time:
+                        grating[sk].phase = numpy.mod(trialclock.getTime(), 1)"""
+                    [sv.draw() for sv in training_stimuli.values()]
+
+                    if self.touchsc:
+                        m_pos = [self.mouse[k1].getPos() for k1 in win_keys]
+                        if all([(m_pos[i] == m_loc[i]).all() for i in range(len(m_pos))]):
+                            pass
+                        else:
+                            s_contain = [t_stim[k].contains(self.mouse[k]) for k in win_keys]
+                            if all(s_contain):
+                                print(f"both stimulus touched")
+                                sys.modules['debugmp'] = [m_pos[0], m_pos[1], t_stim.values()]
+                                # print(sys.modules['debugmp'])
+
+                                k1 = list(t_stim.keys())[1]
+                                [self.mouse[k1].setPos([-900, 0]) for k1 in t_stim.keys()]
+                                s_contain = [t_stim[k1].contains(self.mouse[k1]) for k1 in t_stim.keys()]
+                                continue
+                            if any(s_contain):
+                                print(f"single touch detected: {s_contain}")
+                                m_press = s_contain
+                                # move mice out of grating stimuli
+                                [self.mouse[k1].setPos([-900, 0]) for k1 in t_stim.keys()]
+                                break
+                    trial_time_elapsed = trialclock.getTime()
+                    [self.win[sk1].flip() for sk1 in self.win.keys() if self.win[sk1] is not None]
+
+            n_trials += 1
 
             # add success trial if jumped within time, has to restart from 'up' lickometer
+            # --> what indicates the next trial?
+            if trial_time_elapsed < jump_timeout_s:
+                self.bridge_reward()
+                if trial_time_elapsed < jump_within_s:
+                    print("good job, level up")
+                    break
+                print("good... but can you be faster?")
+                entry_response = None
+                print(f"\n\tEnter to 1st loop, iteration: {n_trials}.")
+                while entry_response is None:
+                    entry_response = self.wait_for_lickometer(['up'], timeout=enter_timeout_s)
+                    if not self.lickemu and entry_response == 'up':
+                        self.bridge_reward()
+                        self.lick_o_meter.reward('up')
+                        print(f"licked at {entry_response}, entry response")
+                        trialclock.reset()
+                        trial_time_elapsed = trialclock.getTime()
+                    if entry_response is None:
+                        self.punish()
 
             # add fail trial and punish if timeout, it has to restart from licking into the 'up' lickometer
-            n_trials += 1
-            trial_time_elapsed = trialclock.getTime()
+            if trial_time_elapsed >= jump_timeout_s:
+                self.punish()
+                print("timeout, you are too slow...")
+                trialclock.reset()
+                trial_time_elapsed = trialclock.getTime()
+
+            # trial_time_elapsed = trialclock.getTime()
         return n_trials
 
     def init_output(self, motion):
@@ -517,5 +613,7 @@ if __name__ == '__main__':
     n_up = 2 if train_basic_task else 1
     experiment = TwoAFC(lickemu=lickemu, touchscreen=True, show_messages=False, windowed=args.windowed)
     stair_params = {'up_steps': n_up, 'down_steps': n_down}
+    experiment.train_jumping(3, 10)
+    core.quit()
     experiment.run_staircase(**stair_params)
 
