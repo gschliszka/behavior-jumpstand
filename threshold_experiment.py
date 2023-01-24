@@ -291,67 +291,90 @@ class TwoAFC:
 
         return mpress, trial_clock.getTime()  # [True False] if first screen chosen
 
-    def train_jumping(self, jump_within_s, enter_timeout_s):
+    def train_jumping(self, jump_within_s, jump_timeout_s=10, enter_timeout_s=10):
         ''' Training level: expect licking into upper lickometer, then jump within jump_within_s amount of time and get reward. '''
-        print("\n\tStarting train_jumping()...")
-        trial_time_elapsed = 0
-        jump_timeout_s = 10  # should be a variable of the function?
         """
-        if elapsed_time < jump_within_s:
+        if trial_time_elapsed < jump_within_s:
             reward()
             end of train_jumping
-        if jump_within_s < elapsed_time < jump_timeout_s:
+            
+        if jump_within_s < trial_time_elapsed < jump_timeout_s:
             reward()
             next trial (start by licking into 'up')
-        if elapsed_time > jump_timeout_s:
+            
+        if trial_time_elapsed > jump_timeout_s:
             punish()
             restart trial (without lickometer, just show stimuli)
         """
-        fix_pos = [-960, 0]
+        print("\n\tStarting train_jumping()...")
+
+        fix_pos = [-960, 0]     # to set mouses' position out of screen
+        n_trials = 0
+
+        trialclock = core.Clock()
+        trial_time_elapsed = 0
+
+        # define stimuli
         win_keys = [sk1 for sk1 in self.win.keys()]
-        training_stimuli = {'gray': visual.GratingStim(self.win[win_keys[0]], sf=0, color=0, colorSpace='rgb',
+
+        gray_stim = {k: visual.GratingStim(self.win[k], sf=0, color=0, colorSpace='rgb', size=self.win[k].size[0],
+                                        tex=None) for k in win_keys}
+        grating_stim = {k: visual.GratingStim(self.win[k], sf=self.grating_p['spatial_freq_deg_per_pix'],
+                                              size=self.grating_p['size'][k], pos=self.grating_p['pos'][k],
+                                              mask='gauss', ori=0) for k in win_keys}
+
+        stim_list = [gray_stim, grating_stim]
+        """
+        tt_stim = {k: stim_list[i][k] for i, k in enumerate(win_keys)}
+        print(gray_stim)
+        print(grating_stim)
+        print(tt_stim)
+
+        print([[k, stim[i]] for i, (k, stim) in enumerate(zip(win_keys, [gray_stim, grating_stim]))])
+        tt_stim = {k: stim[k] for k, stim in zip(win_keys, [gray_stim, grating_stim])}
+        print(f"tt_stim: {tt_stim}")
+        core.quit()"""
+
+        """training_stimuli = {'gray': visual.GratingStim(self.win[win_keys[0]], sf=0, color=0, colorSpace='rgb',
                                          size=self.win[win_keys[0]].size[0], tex=None),
                             'grating': visual.GratingStim(self.win[win_keys[1]], sf=self.grating_p['spatial_freq_deg_per_pix'],
                                             size=self.grating_p['size'][win_keys[1]], pos=self.grating_p['pos'][win_keys[1]],
                                             mask='gauss', ori=0)}
         t_stim = {'left': training_stimuli['gray'],
-                  'right': training_stimuli['grating']}
+                  'right': training_stimuli['grating']}"""
 
-        """while 1:
-            print(f"m_pos: {[self.mouse[sk1].getPos() for sk1 in win_keys]}\ncontain: {[t_stim[k].contains(self.mouse[k]) for k in win_keys]}\n")
-            [self.mouse[k1].setPos([-960, 0]) for k1 in win_keys]
-            core.wait(0.5)"""
+        t_stim = random_training_stim(stim_list, win_keys)
+
+        [sv.draw() for sv in gray_stim.values()]
+        [self.win[sk1].flip() for sk1 in win_keys if self.win[sk1] is not None]
 
         # TODO: write a function which changes the side of stimuli randomly (like random_swap())
         # --> use: ~ training_stimuli['gray'].win = self.win['right']
 
         self.lick_o_meter.reward('up')  # deliver small reward to attract attention/lure animal to lickometer
 
-        n_trials = 0
-        entry_response = None
-        print(f"\n>>> Wait for initiating licking... iteration: {n_trials}.")
-        while entry_response is None:
-            entry_response = self.wait_for_lickometer(['up'], timeout=enter_timeout_s)
-            if not self.lickemu and entry_response == 'up':
-                self.bridge_reward()
-                self.lick_o_meter.reward('up')
-                print(f"licked at {entry_response}, entry response")
-            if entry_response is None:
-                self.punish()
-
         # jump to striped side (other side is uniform gray) and add reward with 80% contingency, 20% leads to silent omission (no sound, no reward)
-        trialclock = core.Clock()
+        entry_response = None
+
         print(f">>> Train jumping started...")
         while trial_time_elapsed < jump_within_s:
-            # TODO: use same strucutre (wait for mouse click) with different stimulus
+
+            # Entry by licking into 'up' (if not timeout before = (entry_response is not None))
+            print(f"\n>>> Wait for initiating licking... iteration: {n_trials}.")
+            while entry_response is None:
+                entry_response = self.wait_for_lickometer(['up'], timeout=enter_timeout_s)
+                if not self.lickemu and entry_response == 'up':
+                    self.bridge_reward()
+                    self.lick_o_meter.reward('up')
+                    print(f"licked at {entry_response}, entry response")
+                if entry_response is None:
+                    self.punish()
+
             trialclock.reset()
             m_press = [0, 0]
-            """[self.mouse[k1].setPos(fix_pos) for k1 in win_keys]
-            m_loc = [self.mouse[sk1].getPos() for sk1 in win_keys]
-            print(f"m_loc: {m_loc}, contains?: {[t_stim[k].contains(self.mouse[k]) for k in win_keys]}")"""
 
             # one screen gray full field, other screen: grating
-            [sv.draw() for sv in training_stimuli.values()]
+            [sv.draw() for sv in t_stim.values()]
             [self.win[sk1].flip() for sk1 in win_keys if self.win[sk1] is not None]
 
             # wait for touch on screens
@@ -364,8 +387,8 @@ class TwoAFC:
                     # move grating (const or vibrate) until a specified time
                     """if trialclock.getTime() < motion_time:
                         grating[sk].phase = numpy.mod(trialclock.getTime(), 1)"""
-                    [sv.draw() for sv in training_stimuli.values()]
-                    # t_stim[sk].draw()
+                    [sv.draw() for sv in t_stim.values()]
+                    [self.win[sk1].flip() for sk1 in win_keys if self.win[sk1] is not None]
 
                     if self.touchsc:
                         m_pos = [self.mouse[k1].getPos() for k1 in win_keys]
@@ -377,53 +400,56 @@ class TwoAFC:
                                 print(f"both stimulus touched, pos: {m_pos}, contains: {s_contain} << {[t_stim[k].contains(self.mouse[k]) for k in win_keys]}")
                                 sys.modules['debugmp'] = [m_pos[0], m_pos[1], t_stim.values()]
                                 # print(sys.modules['debugmp'])
-
                                 k1 = list(t_stim.keys())[1]
                                 [self.mouse[k1].setPos(fix_pos) for k1 in win_keys]
                                 s_contain = [t_stim[k1].contains(self.mouse[k1]) for k1 in win_keys]
                                 print(f"  '>s_contain: {s_contain}")
                                 continue
+
                             if any(s_contain):
                                 print(f"single touch detected: {s_contain}")
                                 m_press = s_contain
                                 # move mice out of grating stimuli
                                 [self.mouse[k1].setPos(fix_pos) for k1 in win_keys]
                                 break
+
                     trial_time_elapsed = trialclock.getTime()
-                    [self.win[sk1].flip() for sk1 in win_keys if self.win[sk1] is not None]
+                    # [self.win[sk1].flip() for sk1 in win_keys if self.win[sk1] is not None]
+                    # [self.win[sk1].flip() for sk1 in win_keys if self.win[sk1] is not None]
 
             n_trials += 1
 
-            print(f"\n>>> Result:")
+            [sv.draw() for sv in gray_stim.values()]
+            [self.win[sk1].flip() for sk1 in win_keys if self.win[sk1] is not None]
+            core.wait(0.5)
+
+            print(f">>> Result:")
             # add success trial if jumped within time, has to restart from 'up' lickometer
             # --> what indicates the next trial?
             if trial_time_elapsed < jump_timeout_s:
                 self.bridge_reward()
+
+                # desired trial time reached, exit from train_jumping
                 if trial_time_elapsed < jump_within_s:
                     print("good job, level up")
+                    core.wait(0.1)
+                    self.bridge_reward()
                     break
+
+                # jumped before jump_timeout_s but after jump_within_s, next trial
                 print("good... but can you be faster?")
                 entry_response = None
-                print(f"\n>>> Wait for initiating licking... iteration: {n_trials}.")
-                while entry_response is None:
-                    entry_response = self.wait_for_lickometer(['up'], timeout=enter_timeout_s)
-                    if not self.lickemu and entry_response == 'up':
-                        self.bridge_reward()
-                        self.lick_o_meter.reward('up')
-                        print(f"licked at {entry_response}, entry response")
-                        trialclock.reset()
-                        trial_time_elapsed = trialclock.getTime()
-                    if entry_response is None:
-                        self.punish()
 
             # add fail trial and punish if timeout, it has to restart from licking into the 'up' lickometer
             if trial_time_elapsed >= jump_timeout_s:
                 self.punish()
                 print("timeout, you are too slow...")
-                trialclock.reset()
-                trial_time_elapsed = trialclock.getTime()
+
 
             # trial_time_elapsed = trialclock.getTime()
+            trialclock.reset()
+            trial_time_elapsed = trialclock.getTime()
+            t_stim = random_training_stim(stim_list, win_keys)
         return n_trials
 
     def init_output(self, motion):
@@ -587,6 +613,14 @@ class TwoAFC:
         core.quit()
     
 
+def random_training_stim(stim_list:list, win_keys:list):
+    if random.choice([0, 1]):
+        s1 = stim_list[0]
+        stim_list[0] = stim_list[1]
+        stim_list[1] = s1
+    return {k: stim_list[i][k] for i, k in enumerate(win_keys)}
+
+
 def random_swap(previous:dict):
     """
 
@@ -623,7 +657,7 @@ if __name__ == '__main__':
     n_up = 2 if train_basic_task else 1
     experiment = TwoAFC(lickemu=lickemu, touchscreen=True, show_messages=False, windowed=args.windowed)
     stair_params = {'up_steps': n_up, 'down_steps': n_down}
-    experiment.train_jumping(3, 10)
+    experiment.train_jumping(1, 5, 10)
     core.wait(1)
     core.quit()
     experiment.run_staircase(**stair_params)

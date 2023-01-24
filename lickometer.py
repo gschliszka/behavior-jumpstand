@@ -113,7 +113,7 @@ class Protocol(Arduino, RewardAmount):
         return self.read_line()
 
     def reward(self, side: str):
-        size = self.current_size
+        # size = self.current_size
         # TODO: transmit size to arduino
         self.write_order(self.Order.SIDE)
         self.write_order(self.command[side])
