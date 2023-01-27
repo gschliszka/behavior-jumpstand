@@ -12,6 +12,8 @@ import random
 import pytest
 from screeninfo import get_monitors
 detected_monitors = get_monitors()
+print(f"Detected monitors:")
+[print(f"\t{mon}") for mon in detected_monitors]
 from psychopy import core, visual, gui, data, event
 from psychopy.tools.filetools import fromFile, toFile
 
@@ -23,6 +25,10 @@ def debughook(etype, value, tb):
     print() # make a new line before launching post-mortem
     # pdb.pm() # post-mortem debugger
 sys.excepthook = debughook
+
+machine_dict = {'LabThinkpadStim': 101707888628436,
+                '2pgoe': 93181002139480,
+                'Gazsi::laptop': 220292358129433}
 
 class TwoAFC:
     def __init__(self, lickemu, touchscreen=False, show_messages=False, windowed=None):
@@ -169,7 +175,6 @@ class TwoAFC:
             # if cat licks into non-valid lickometers, give punishment
             tc = core.Clock()
             # print(f"started! {tc.getTime()}")
-            # TODO: write function 'set_timeout' for Arduino and insert into the protocol --> implement inf case too
             self.lick_o_meter.set_timeout(timeout)
             t = time.time()
             licks = self.lick_o_meter.watch_licks()
@@ -194,6 +199,36 @@ class TwoAFC:
                 print(f'good: {resp}')
                 return resp
 
+    def is_touched(self, stimuli:dict):
+        win_keys = [sk1 for sk1 in self.win.keys()]
+        fix_pos = [-960, 0]  # to set mouses' position out of screen
+
+        [self.mouse[k1].setPos(fix_pos) for k1 in win_keys]  # set to outside screen so that actual touch represents a big change between current mouse position and the touch coordinate
+        m_loc = [self.mouse[sk1].getPos() for sk1 in win_keys]
+
+        if self.touchsc:
+            m_pos = [self.mouse[k1].getPos() for k1 in win_keys]
+            if all([(m_pos[i] == m_loc[i]).all() for i in range(len(m_pos))]):
+                return [0, 0]
+            else:
+                s_contain = [stimuli[k].contains(self.mouse[k]) for k in win_keys]
+                if all(s_contain):
+                    print(
+                        f"both stimulus touched, pos: {m_pos}, contains: {s_contain} << {[stimuli[k].contains(self.mouse[k]) for k in win_keys]}")
+                    sys.modules['debugmp'] = [m_pos[0], m_pos[1], t_stim.values()]
+                    # print(sys.modules['debugmp'])
+                    k1 = list(stimuli.keys())[1]
+                    [self.mouse[k1].setPos(fix_pos) for k1 in win_keys]
+                    s_contain = [stimuli[k1].contains(self.mouse[k1]) for k1 in win_keys]
+                    print(f"  '>s_contain: {s_contain}")
+                    return [0, 0]
+
+                if any(s_contain):
+                    print(f"single touch detected: {s_contain}")
+                    m_press = s_contain
+                    # move mice out of grating stimuli
+                    [self.mouse[k1].setPos(fix_pos) for k1 in win_keys]
+                    return s_contain
 
     def iterate_motion_time_grating_2afc(self, grating, messages, time_dict, trial_clock):
         if messages: messages['pre'].draw()
@@ -202,7 +237,6 @@ class TwoAFC:
 
         # keep screens blank until subject licks into lickometer on the stand
         entry_response = self.wait_for_lickometer(['up'])
-        # TODO: Arduino code changed! If timeout: entry_response = None --> set timeout = inf.
         if not self.lickemu and entry_response == 'up':
             self.lick_o_meter.reward('up')
         print(f"licked at {entry_response}, entry response")
@@ -369,7 +403,7 @@ class TwoAFC:
                     print(f"licked at {entry_response}, entry response")
                 if entry_response is None:
                     self.punish()
-                    print(f"\n PUSH CAT HEAD GENTLY TOWARDS LICKOMETER!")
+                    print(f"\n PUSH CAT HEAD GENTLY TOWARDS LICKOMETER!\n")
                 entry_times[-1].append(trialclock.getTime())
             entry_response = None  # reset so that licking into 'up' lickometer is required in next trial again
 
@@ -383,6 +417,8 @@ class TwoAFC:
             # wait for touch on screens
             print(f"\n>>> Training loop, iteration: {len(trial_outcome)-1}.")
             while (trial_time_elapsed < jump_within_s) and not any(m_press):
+                # FIXME: After no-jump trials we punish and next trial starts. Is it fine?
+                #      - Idea: punish and restart this loop
                 # maybe needed if a real mouse is used instead of IR screen: m_press = [0, 0]
                 [self.mouse[k1].setPos(fix_pos) for k1 in win_keys]  # set to outside screen so that actual touch represents a big change between current mouse position and the touch coordinate
                 m_loc = [self.mouse[sk1].getPos() for sk1 in win_keys]
@@ -396,6 +432,7 @@ class TwoAFC:
                     [self.win[sk1].flip() for sk1 in win_keys if self.win[sk1] is not None]
 
 # TODO: refactor into separate function
+                    """
                     if self.touchsc:
                         m_pos = [self.mouse[k1].getPos() for k1 in win_keys]
                         if all([(m_pos[i] == m_loc[i]).all() for i in range(len(m_pos))]):
@@ -418,6 +455,8 @@ class TwoAFC:
                                 # move mice out of grating stimuli
                                 [self.mouse[k1].setPos(fix_pos) for k1 in win_keys]
                                 break
+                    """
+                    m_press = self.is_touched(t_stim)
 
                     trial_time_elapsed = trialclock.getTime()
 
@@ -430,7 +469,7 @@ class TwoAFC:
             # Evaluation of response
             j_choice = 'left' if m_press[0] else 'right'
             print(f"j_choice: {j_choice}, t_stim[j_choice].name: {t_stim[j_choice].name}")
-            if t_stim[j_choice].name != 'grating':
+            if t_stim[j_choice].name != 'grating':  # jumped to non-target
                 self.punish()
                 print(f"bad choice")
                 trial_outcome.append(False)

@@ -80,7 +80,8 @@ class Protocol(Arduino, RewardAmount):
         self.initial_values = self.read_line()
         self.command = {i.name.lower(): i for i in self.Order}
         self.printing = False
-        print('End __init__ of Protocol')
+        # print('End __init__ of Protocol')
+        print(f"\tv: {self.version}\n\tinit.val: {self.initial_values}")
 
     class Order(Enum):
         """
