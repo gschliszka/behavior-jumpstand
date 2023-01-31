@@ -12,8 +12,8 @@ import random
 import pytest
 from screeninfo import get_monitors
 detected_monitors = get_monitors()
-print(f"Detected monitors:")
-[print(f"\t{mon}") for mon in detected_monitors]
+# print(f"Detected monitors:")
+# [print(f"\t{mon}") for mon in detected_monitors]
 from psychopy import core, visual, gui, data, event
 from psychopy.tools.filetools import fromFile, toFile
 
@@ -114,6 +114,13 @@ class TwoAFC:
         self.mouse = {wk: event.Mouse(win=wv) for wk,wv in self.win.items()}
 
     def punish(self):
+        """
+        Gives punish cue.
+        # TODO: make punish sizeable (set_size())
+        Returns
+        -------
+
+        """
         self.feedback_sound['punish'].stop()
         self.feedback_sound['punish'].play()
         # if not self.lickemu:
@@ -199,12 +206,13 @@ class TwoAFC:
                 print(f'good: {resp}')
                 return resp
 
-    def is_touched(self, stimuli:dict):
+    def is_touched(self, stimuli:dict, m_loc):
         win_keys = [sk1 for sk1 in self.win.keys()]
         fix_pos = [-960, 0]  # to set mouses' position out of screen
 
-        [self.mouse[k1].setPos(fix_pos) for k1 in win_keys]  # set to outside screen so that actual touch represents a big change between current mouse position and the touch coordinate
-        m_loc = [self.mouse[sk1].getPos() for sk1 in win_keys]
+        # [self.mouse[k1].setPos(fix_pos) for k1 in win_keys]  # set to outside screen so that actual touch represents a big change between current mouse position and the touch coordinate
+        # m_loc = [self.mouse[sk1].getPos() for sk1 in win_keys]
+        # print(f"m_loc: {m_loc}")
 
         if self.touchsc:
             m_pos = [self.mouse[k1].getPos() for k1 in win_keys]
@@ -213,9 +221,8 @@ class TwoAFC:
             else:
                 s_contain = [stimuli[k].contains(self.mouse[k]) for k in win_keys]
                 if all(s_contain):
-                    print(
-                        f"both stimulus touched, pos: {m_pos}, contains: {s_contain} << {[stimuli[k].contains(self.mouse[k]) for k in win_keys]}")
-                    sys.modules['debugmp'] = [m_pos[0], m_pos[1], t_stim.values()]
+                    print(f"both stimulus touched, pos: {m_pos}, contains: {s_contain} << {[stimuli[k].contains(self.mouse[k]) for k in win_keys]}")
+                    sys.modules['debugmp'] = [m_pos[0], m_pos[1], stimuli.values()]
                     # print(sys.modules['debugmp'])
                     k1 = list(stimuli.keys())[1]
                     [self.mouse[k1].setPos(fix_pos) for k1 in win_keys]
@@ -230,7 +237,11 @@ class TwoAFC:
                     [self.mouse[k1].setPos(fix_pos) for k1 in win_keys]
                     return s_contain
 
+                else:
+                    return [0, 0]
+
     def iterate_motion_time_grating_2afc(self, grating, messages, time_dict, trial_clock):
+        # TODO: save data as train_jumping
         if messages: messages['pre'].draw()
         [self.win[sk1].flip() for sk1 in self.win.keys() if self.win[sk1] is not None]
         core.wait(time_dict['message'])
@@ -390,7 +401,7 @@ class TwoAFC:
         motion_time = 0.5  # short moving grating to elicit attention
         print(f">>> Train jumping started...")
         # keep doing trials until N successful trials in the last 5 trials is less than the percent_correct_required
-        while len(trial_outcome) < eval_win and sum(trial_outcome[-eval_win:])/eval_win < percent_correct_required/100:
+        while len(trial_outcome) < eval_win or sum(trial_outcome[-eval_win:])/eval_win < percent_correct_required/100:
 
             # Entry by licking into 'up' (if not timeout before = (entry_response is not None))
             print(f"\n>>> Wait for initiating licking... iteration: {len(trial_outcome)-1}.")
@@ -417,8 +428,10 @@ class TwoAFC:
             # wait for touch on screens
             print(f"\n>>> Training loop, iteration: {len(trial_outcome)-1}.")
             while (trial_time_elapsed < jump_within_s) and not any(m_press):
-                # FIXME: After no-jump trials we punish and next trial starts. Is it fine?
-                #      - Idea: punish and restart this loop
+                """
+                After no-jump trials we punish, wait 3s and restart next trial withoutwait_for_lickometer
+                """
+
                 # maybe needed if a real mouse is used instead of IR screen: m_press = [0, 0]
                 [self.mouse[k1].setPos(fix_pos) for k1 in win_keys]  # set to outside screen so that actual touch represents a big change between current mouse position and the touch coordinate
                 m_loc = [self.mouse[sk1].getPos() for sk1 in win_keys]
@@ -431,32 +444,7 @@ class TwoAFC:
                     [sv.draw() for sv in t_stim.values()]
                     [self.win[sk1].flip() for sk1 in win_keys if self.win[sk1] is not None]
 
-# TODO: refactor into separate function
-                    """
-                    if self.touchsc:
-                        m_pos = [self.mouse[k1].getPos() for k1 in win_keys]
-                        if all([(m_pos[i] == m_loc[i]).all() for i in range(len(m_pos))]):
-                            pass
-                        else:
-                            s_contain = [t_stim[k].contains(self.mouse[k]) for k in win_keys]
-                            if all(s_contain):
-                                print(f"both stimulus touched, pos: {m_pos}, contains: {s_contain} << {[t_stim[k].contains(self.mouse[k]) for k in win_keys]}")
-                                sys.modules['debugmp'] = [m_pos[0], m_pos[1], t_stim.values()]
-                                # print(sys.modules['debugmp'])
-                                k1 = list(t_stim.keys())[1]
-                                [self.mouse[k1].setPos(fix_pos) for k1 in win_keys]
-                                s_contain = [t_stim[k1].contains(self.mouse[k1]) for k1 in win_keys]
-                                print(f"  '>s_contain: {s_contain}")
-                                continue
-
-                            if any(s_contain):
-                                print(f"single touch detected: {s_contain}")
-                                m_press = s_contain
-                                # move mice out of grating stimuli
-                                [self.mouse[k1].setPos(fix_pos) for k1 in win_keys]
-                                break
-                    """
-                    m_press = self.is_touched(t_stim)
+                    m_press = self.is_touched(t_stim, m_loc)    # read touches
 
                     trial_time_elapsed = trialclock.getTime()
 
@@ -477,9 +465,9 @@ class TwoAFC:
                 # TODO: eliminate code duplication!
                 trialclock.reset()
                 trial_time_elapsed = trialclock.getTime()
-                entry_response = None
+                entry_response = ''
                 t_stim = random_training_stim(stim_list, win_keys)
-                core.wait(0.2)
+                core.wait(3)
                 continue
 
             # add success trial if jumped within time, has to restart from 'up' lickometer
@@ -497,12 +485,14 @@ class TwoAFC:
                 trial_times.append(trialclock.getTime())
                 print("timeout, you are too slow...")
 
-# tODO: remove code repeat
+# TODO: remove code repeat
             # trial_time_elapsed = trialclock.getTime()
             trialclock.reset()
             trial_time_elapsed = trialclock.getTime()
             t_stim = random_training_stim(stim_list, win_keys)
-        print(f"Trial successes: {trial_outcome} \n Trial completed (s): {trial_times}\n Trial init times (up lick):{entry_times}")
+        print(f"Trial successes: {trial_outcome} --> percent correct: {sum(trial_outcome[-eval_win:])/eval_win}\n"
+              f"\t>>> result: {sum(trial_outcome[-eval_win:])/eval_win >= percent_correct_required/100}\n"
+              f"Trial completed (s): {trial_times}\n Trial init times (up lick):{entry_times}")
         return trial_outcome, trial_times, entry_times
 
     def init_output(self, motion):
@@ -710,7 +700,7 @@ if __name__ == '__main__':
     n_up = 2 if train_basic_task else 1
     experiment = TwoAFC(lickemu=lickemu, touchscreen=True, show_messages=False, windowed=args.windowed)
     stair_params = {'up_steps': n_up, 'down_steps': n_down}
-    experiment.train_jumping(3, 80, 3)
+    experiment.train_jumping(jump_within_s=3, percent_correct_required=80, enter_timeout_s=3)
     core.wait(1)
     core.quit()
     experiment.run_staircase(**stair_params)

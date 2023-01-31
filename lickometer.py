@@ -79,9 +79,9 @@ class Protocol(Arduino, RewardAmount):
         self.version = self.read_line()
         self.initial_values = self.read_line()
         self.command = {i.name.lower(): i for i in self.Order}
-        self.printing = False
+        self.printing = True
         # print('End __init__ of Protocol')
-        print(f"\tv: {self.version}\n\tinit.val: {self.initial_values}")
+        # print(f"\tv: {self.version}\n\tinit.val: {self.initial_values}")
 
     class Order(Enum):
         """
@@ -102,6 +102,8 @@ class Protocol(Arduino, RewardAmount):
         UP = 23
 
         SET_TIMEOUT = 25
+        SET_SIZE = 26
+        CALIBRATE = 27
 
         # control
         INVALID_ORDER = 90
@@ -109,6 +111,43 @@ class Protocol(Arduino, RewardAmount):
         DONE = 92
 
         NONE = 100
+
+    def set_size(self, size):
+        self.write_order(self.Order.SET_SIZE)
+        self.write_i16(size)
+        result = self.read_i16()
+        if self.printing: print(f'Lickometer.set_size({result})')
+
+    def calibrate_pump(self, pump:list, motor_time, motor_speed):
+        if motor_time > 0 and motor_time != float('inf'):
+            motor_time *= 1000  # convert timeout: s --> ms
+        else:
+            motor_time = 0
+
+        allowed_pumps = ['up', 'left', 'right']
+        self.write_order(self.Order.CALIBRATE)
+
+        self.write_i32(motor_time)
+        time = self.read_i32()
+
+        self.write_i16(motor_speed)
+        speed = self.read_i16()
+
+        if self.printing: print(f'Lickometer.calibrate_pump({time}, {speed})')
+
+        """for p in pump:
+            self.write_order(self.Order.CALIBRATE)
+
+            self.write_order(self.command[p])
+            self.write_i32(motor_time)
+            self.write_i8(motor_speed)
+
+            side = self.read_order()
+            time = self.read_i32()
+            speed = self.read_i8()
+
+            if self.printing: print(f'Lickometer.calibrate_pump({side}, {time}, {speed})')
+        """
 
     def set_timeout(self, timeout):
         if timeout > 0 and timeout != float('inf'):
@@ -241,6 +280,38 @@ if __name__ == '__main__':
 
     print(f"version: {arduino.version}")
     print(f"init val: {arduino.initial_values}")
+
+    # arduino.calibrate_pump(['up'], 1000, 200)
+    # arduino.calibrate_pump(['left', 'right'], 2000, 180)
+
+    """
+    arduino.calibrate_pump([], 2, 200)
+    print('Reward up')
+    arduino.reward('up')
+    time.sleep(3)
+    """
+
+    arduino.calibrate_pump([], 1, 255)
+    print('Reward left')
+    arduino.reward('left')
+    time.sleep(1+1)
+
+    arduino.set_size(2)
+    print('Reward left')
+    arduino.reward('left')
+    time.sleep(2+1)
+
+    arduino.set_size(3)
+    print('Reward left')
+    arduino.reward('left')
+    time.sleep(3 + 1)
+
+    arduino.calibrate_pump([], 3, 200)
+    print('Reward right')
+    arduino.reward('right')
+    time.sleep(3)
+
+    exit(518)
 
     i_8 = []
     i_16 = []
