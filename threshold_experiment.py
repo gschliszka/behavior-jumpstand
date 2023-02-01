@@ -43,7 +43,7 @@ class TwoAFC:
         if not self.lickemu:
             try:
                 import lickometer
-                self.lick_o_meter = lickometer.Protocol()
+                self.lick_o_meter = lickometer.Lickometer()
                 trialtext = ''
             except:
                 self.lickemu = 1
@@ -116,7 +116,7 @@ class TwoAFC:
     def punish(self):
         """
         Gives punish cue.
-        # TODO: make punish sizeable (set_size())
+        # TODO: make punish sizeable (set_size()) --> volume-control
         Returns
         -------
 
@@ -392,7 +392,7 @@ class TwoAFC:
         self.lick_o_meter.reward('up')
 
         # jump to striped side (other side is uniform gray) and add reward with 80% contingency, 20% leads to silent omission (no sound, no reward)
-        # TODO: implement contingency-rewarding
+        # TODO: if needed add randomness into the process
         entry_response = None
         trial_times = []
         trial_outcome = []
@@ -462,7 +462,7 @@ class TwoAFC:
                 print(f"bad choice")
                 trial_outcome.append(False)
                 trial_times.append(trialclock.getTime())
-                # TODO: eliminate code duplication!
+                # FIXME: eliminate code duplication!
                 trialclock.reset()
                 trial_time_elapsed = trialclock.getTime()
                 entry_response = ''
@@ -485,7 +485,7 @@ class TwoAFC:
                 trial_times.append(trialclock.getTime())
                 print("timeout, you are too slow...")
 
-# TODO: remove code repeat
+# FIXME: remove code repeat
             # trial_time_elapsed = trialclock.getTime()
             trialclock.reset()
             trial_time_elapsed = trialclock.getTime()
