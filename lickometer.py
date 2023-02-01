@@ -1,4 +1,6 @@
 import logging
+import random
+
 import serial
 import serial.tools.list_ports as list_ports
 import struct
@@ -59,14 +61,17 @@ class RewardAmount:
 
     @property
     def current_size(self):
+        print('\n-----------------')
         self.history.append(self.calculate_size())
+        print(f"self.history: {self.history}")
+        print('-----------------\n')
         return self.history[-1]
 
     def calculate_size(self):
         rewarded = [v1 > 0 for v1 in self.history]  # size can vary, get the occurrences of nonzero rewards
         print(f"rewarded: {rewarded}")
-        # print(f"len(self.history): {len(self.history)}\nself.contingency_percent: {self.contingency_percent}")
-        if len(rewarded) < len(self.history) * self.contingency_percent / 100:
+        print(f"len(self.history): {len(self.history)}\nself.contingency_percent: {self.contingency_percent}")
+        if sum(rewarded) < len(self.history) * self.contingency_percent / 100:
             return self.size
         else:
             return 0
@@ -112,6 +117,7 @@ class Protocol(Arduino, RewardAmount):
 
         NONE = 100
 
+    '''
     def set_size(self, size):
         self.write_order(self.Order.SET_SIZE)
         self.write_i16(size)
@@ -169,13 +175,20 @@ class Protocol(Arduino, RewardAmount):
         if self.printing: print(f'->Lickometer.watch(state): {result2}')
         return self.read_line()
 
-    def reward(self, side: str):
+    def reward(self, side: str, size=-1):
         # size = self.current_size
-        # TODO: transmit size to arduino
+
+        # set reward size
+        if not size == -1:
+            self.set_size(size)
+
+        # set rewarding side
         self.write_order(self.Order.SIDE)
         self.write_order(self.command[side])
         result = self.read_line()
         if self.printing: print(f'-->Lickometer.reward(side): {result}')
+
+        # give reward
         self.write_order(self.Order.REW)
         result2 = self.read_line()
         if self.printing: print(f'->Lickometer.reward(state): {result2}')
@@ -185,6 +198,7 @@ class Protocol(Arduino, RewardAmount):
         self.write_order(self.Order.NOR)
         result = self.read_line()
         if self.printing: print(f'-->Lickometer.punish: {result}')
+    '''
 
     def read_order(self):
         """
@@ -274,8 +288,95 @@ class Protocol(Arduino, RewardAmount):
             return self.read_order(), self.read_i16(), self.read_i32()
 
 
+class Lickometer(Protocol):
+    def __init__(self, **kwargs):
+        super(Lickometer, self).__init__(**kwargs)
+
+    def set_size(self, size):
+        self.write_order(self.Order.SET_SIZE)
+        self.write_i16(size)
+        result = self.read_i16()
+        if self.printing: print(f'Lickometer.set_size({result})')
+
+    def calibrate_pump(self, pump:list, motor_time, motor_speed):
+        if motor_time > 0 and motor_time != float('inf'):
+            motor_time *= 1000  # convert timeout: s --> ms
+            motor_time = int(motor_time)
+        else:
+            motor_time = 0
+
+        allowed_pumps = ['up', 'left', 'right']
+        self.write_order(self.Order.CALIBRATE)
+
+        self.write_i32(motor_time)
+        time = self.read_i32()
+
+        self.write_i16(motor_speed)
+        speed = self.read_i16()
+
+        if self.printing: print(f'Lickometer.calibrate_pump({time}, {speed})')
+
+        """for p in pump:
+            self.write_order(self.Order.CALIBRATE)
+
+            self.write_order(self.command[p])
+            self.write_i32(motor_time)
+            self.write_i8(motor_speed)
+
+            side = self.read_order()
+            time = self.read_i32()
+            speed = self.read_i8()
+
+            if self.printing: print(f'Lickometer.calibrate_pump({side}, {time}, {speed})')
+        """
+
+    def set_timeout(self, timeout):
+        if timeout > 0 and timeout != float('inf'):
+            timeout *= 1000     # convert timeout: s --> ms
+        else:
+            timeout = 0
+
+        if self.printing: print(f'\n-->Lickometer.set_timeout(t): t: {timeout}, type: {type(timeout)}')
+        self.write_order(self.Order.SET_TIMEOUT)
+        self.write_i32(timeout)
+        result = self.read_i32()
+        if self.printing: print(f'-->I got (for timeout): {result}, type: {type(result)}')
+        result = self.read_line()
+        if self.printing: print(f'-->Lickometer.set_timeout(t): r: {result}, type: {type(result)}')
+
+    def watch_licks(self):
+        self.write_order(self.Order.WFL)
+        result2 = self.read_line()
+        if self.printing: print(f'->Lickometer.watch(state): {result2}')
+        return self.read_line()
+
+    def reward(self, side: str, size=-1):
+        s = self.current_size
+
+        # set reward size
+        if not size == -1:
+            self.set_size(size)
+
+        # set rewarding side
+        self.write_order(self.Order.SIDE)
+        self.write_order(self.command[side])
+        result = self.read_line()
+        if self.printing: print(f'-->Lickometer.reward(side): {result}')
+
+        # give reward
+        self.write_order(self.Order.REW)
+        result2 = self.read_line()
+        if self.printing: print(f'->Lickometer.reward(state): {result2}')
+        return self.read_line()
+
+    def punish(self):
+        self.write_order(self.Order.NOR)
+        result = self.read_line()
+        if self.printing: print(f'-->Lickometer.punish: {result}')
+
+
 if __name__ == '__main__':
-    arduino = Protocol()
+    arduino = Lickometer()
     order = arduino.Order
 
     print(f"version: {arduino.version}")
@@ -290,21 +391,46 @@ if __name__ == '__main__':
     arduino.reward('up')
     time.sleep(3)
     """
+    [arduino.set_size(i) for i in range(10)]
 
+    #kap = [arduino.current_size() for kim in range(10)]
+
+    sides = ['up', 'left', 'right']
+    arduino.calibrate_pump([], 0.01, 255)
+
+    for i in range(200):
+        print(f"Iteration: {i}.")
+        random.shuffle(sides)
+        arduino.reward(sides[0])
+        time.sleep(0.2)
+
+    exit(111)
     arduino.calibrate_pump([], 1, 255)
     print('Reward left')
     arduino.reward('left')
     time.sleep(1+1)
 
+    #exit(519)
+
     arduino.set_size(2)
     print('Reward left')
     arduino.reward('left')
-    time.sleep(2+1)
+    time.sleep(2 + 1)
 
     arduino.set_size(3)
     print('Reward left')
     arduino.reward('left')
     time.sleep(3 + 1)
+
+    arduino.calibrate_pump([], 3, 200)
+    print('Reward right')
+    arduino.reward('right')
+    time.sleep(3)
+
+    arduino.calibrate_pump([], 3, 255)
+    print('Reward right')
+    arduino.reward('right')
+    time.sleep(3)
 
     arduino.calibrate_pump([], 3, 200)
     print('Reward right')
