@@ -61,6 +61,7 @@ class TwoAFC:
             screen_ids = (1, 0)
         elif computer == 220292358129433:
             # Gazsi's laptop
+            # BUG: this machine switches L-R lickometers
             monitor_params = {'distance_cm': 40}
             screen_ids = (2, 1)
         else:
@@ -478,6 +479,10 @@ class TwoAFC:
                 trial_times.append(trialclock.getTime())
                 # desired trial time reached and previous trial was not fail, exit from train_jumping
                 print("good job, level up")
+                jump_rew_response = self.wait_for_lickometer([j_choice], timeout=enter_timeout_s)
+                if jump_rew_response == j_choice:
+                    self.deliver_reward(jump_rew_response)
+                core.wait(1)
             else:
                 # add fail trial and punish if timeout, it has to restart from licking into the 'up' lickometer
                 self.punish()
@@ -701,7 +706,7 @@ if __name__ == '__main__':
     experiment = TwoAFC(lickemu=lickemu, touchscreen=True, show_messages=False, windowed=args.windowed)
     stair_params = {'up_steps': n_up, 'down_steps': n_down}
     experiment.train_jumping(jump_within_s=3, percent_correct_required=80, enter_timeout_s=3)
-    core.wait(1)
-    core.quit()
+    # core.wait(1)
+    # core.quit()
     experiment.run_staircase(**stair_params)
 
