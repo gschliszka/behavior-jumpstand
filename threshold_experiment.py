@@ -393,6 +393,7 @@ class TwoAFC:
 
         # jump to striped side (other side is uniform gray) and add reward with 80% contingency, 20% leads to silent omission (no sound, no reward)
         # TODO: if needed add randomness into the process
+        #       after first trainings...
         entry_response = None
         trial_times = []
         trial_outcome = []
