@@ -54,12 +54,12 @@ class RewardAmount:
         # print('Start __init__ of RewardAmount...')
         super(RewardAmount, self).__init__()
         self.contingency_percent = kwargs.get('contingency_percent')
-        self.size = kwargs.get('size')
+        self.rew_size = kwargs.get('rew_size')
         self.time_since_start = time.time()
         self.history = []
         # print('End __init__ of RewardAmount')
 
-    @property
+    # @property
     def current_size(self):
         print('\n-----------------')
         self.history.append(self.calculate_size())
@@ -69,18 +69,20 @@ class RewardAmount:
 
     def calculate_size(self):
         rewarded = [v1 > 0 for v1 in self.history]  # size can vary, get the occurrences of nonzero rewards
-        print(f"rewarded: {rewarded}")
+        print(f"rewarded: {rewarded} --> sum: {sum(rewarded)}")
         print(f"len(self.history): {len(self.history)}\nself.contingency_percent: {self.contingency_percent}")
+        if len(rewarded) == 0:
+            return self.rew_size
         if sum(rewarded) < len(self.history) * self.contingency_percent / 100:
-            return self.size
+            return self.rew_size
         else:
             return 0
 
 
 class Protocol(Arduino, RewardAmount):
-    def __init__(self, rate=19200, timeout=1, contingency_percent=80, size=1):
+    def __init__(self, rate=19200, timeout=1, contingency_percent=80, rew_size=1):
         # print('Start __init__ of Protocol...')
-        super(Protocol, self).__init__(rate=rate, timeout=timeout, contingency_percent=contingency_percent, size=size)
+        super(Protocol, self).__init__(rate=rate, timeout=timeout, contingency_percent=contingency_percent, rew_size=rew_size)
         self.version = self.read_line()
         self.initial_values = self.read_line()
         self.command = {i.name.lower(): i for i in self.Order}
@@ -351,7 +353,12 @@ class Lickometer(Protocol):
         return self.read_line()
 
     def reward(self, side: str, size=-1):
-        s = self.current_size
+        # 'up' lickometer: 100%
+        if side == 'up':
+            self.set_size(self.rew_size)
+        if side != 'up':
+            s = self.current_size()
+            self.set_size(s)
 
         # set reward size
         if not size == -1:
@@ -397,8 +404,9 @@ if __name__ == '__main__':
 
     sides = ['up', 'left', 'right']
     arduino.calibrate_pump([], 0.01, 255)
+    arduino.set_size(1)
 
-    for i in range(200):
+    for i in range(20):
         print(f"Iteration: {i}.")
         random.shuffle(sides)
         arduino.reward(sides[0])
