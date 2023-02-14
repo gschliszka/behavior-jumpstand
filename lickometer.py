@@ -61,7 +61,7 @@ class RewardAmount:
 
     # @property
     def current_size(self):
-        print('\n-----------------')
+        print('-----------------')
         self.history.append(self.calculate_size())
         print(f"self.history: {self.history}")
         print('-----------------\n')
@@ -107,6 +107,7 @@ class Protocol(Arduino, RewardAmount):
         LEFT = 21
         RIGHT = 22
         UP = 23
+        ALL = 24
 
         SET_TIMEOUT = 25
         SET_SIZE = 26
@@ -293,93 +294,146 @@ class Protocol(Arduino, RewardAmount):
 class Lickometer(Protocol):
     def __init__(self, **kwargs):
         super(Lickometer, self).__init__(**kwargs)
+        self.allowed_pumps = ['up', 'left', 'right']
 
-    def set_size(self, size):
-        self.write_order(self.Order.SET_SIZE)
-        self.write_i16(size)
-        result = self.read_i16()
-        if self.printing: print(f'Lickometer.set_size({result})')
+    def set_size(self, size, pumps=None):
+        if not pumps:
+            pumps = ['all']
 
-    def calibrate_pump(self, pump:list, motor_time, motor_speed):
+        for p in pumps:
+            # Order
+            self.write_order(self.Order.SET_SIZE)
+            order_result = self.read_order()
+            if self.printing: print(f'Lickometer.set_size: {order_result}')
+
+            # Parameters
+            #   pump
+            self.write_order(self.command[p])
+            pump_result = self.read_order()
+            #   size
+            self.write_i16(size)
+            size_result = self.read_i16()
+            if self.printing: print(f'Lickometer.set_size({pump_result}, {size_result})\n')
+
+    def calibrate_pump(self, motor_time, motor_speed, pumps=None):
+        if not pumps:
+            pumps = ['all']
+
+        # Validate motor_time and motor_speed
         if motor_time > 0 and motor_time != float('inf'):
-            motor_time *= 1000  # convert timeout: s --> ms
+            motor_time *= 1000  # convert motor_time: s --> ms
             motor_time = int(motor_time)
         else:
             motor_time = 0
 
-        allowed_pumps = ['up', 'left', 'right']
-        self.write_order(self.Order.CALIBRATE)
+        if motor_speed < 0:
+            motor_speed = 0
+        if motor_speed > 255:
+            motor_speed = 255
 
-        self.write_i32(motor_time)
-        time = self.read_i32()
-
-        self.write_i16(motor_speed)
-        speed = self.read_i16()
-
-        if self.printing: print(f'Lickometer.calibrate_pump({time}, {speed})')
-
-        """for p in pump:
+        for p in pumps:
+            # Order
             self.write_order(self.Order.CALIBRATE)
+            order_result = self.read_order()
+            if self.printing: print(f'Lickometer.calibrate_pump: {order_result}')
 
+            # Parameters
+            #   pump
             self.write_order(self.command[p])
+            pump_result = self.read_order()
+            #   motor_time
             self.write_i32(motor_time)
-            self.write_i8(motor_speed)
-
-            side = self.read_order()
-            time = self.read_i32()
-            speed = self.read_i8()
-
-            if self.printing: print(f'Lickometer.calibrate_pump({side}, {time}, {speed})')
-        """
+            time_result = self.read_i32()
+            #   motor_speed
+            self.write_i16(motor_speed)
+            speed_result = self.read_i16()
+            if self.printing: print(f'Lickometer.calibrate_pump({pump_result}, {time_result}, {speed_result})\n')
 
     def set_timeout(self, timeout):
+        # Validate timeout
         if timeout > 0 and timeout != float('inf'):
             timeout *= 1000     # convert timeout: s --> ms
         else:
             timeout = 0
 
-        if self.printing: print(f'\n-->Lickometer.set_timeout(t): t: {timeout}, type: {type(timeout)}')
+        # Order
         self.write_order(self.Order.SET_TIMEOUT)
+        order_result = self.read_order()
+        if self.printing: print(f'Lickometer.set_timeout: {order_result}')
+
+        # Parameters
         self.write_i32(timeout)
-        result = self.read_i32()
-        if self.printing: print(f'-->I got (for timeout): {result}, type: {type(result)}')
-        result = self.read_line()
-        if self.printing: print(f'-->Lickometer.set_timeout(t): r: {result}, type: {type(result)}')
+        time_result = self.read_i32()
+        inf_result = self.read_order()
+        if self.printing: print(f'Lickometer.set_timeout({time_result}, finite timeout={inf_result})\n')
 
     def watch_licks(self):
+        """
+        Set Lickometer in WFL (wait for licking) state and give feedback
+        Returns
+        -------
+        str: 'abc' a: up, b: left, c: right --> a, b, c: lick=1 & no_lick=0
+        """
+
+        # Order
         self.write_order(self.Order.WFL)
-        result2 = self.read_line()
-        if self.printing: print(f'->Lickometer.watch(state): {result2}')
-        return self.read_line()
+        order_result = self.read_order()
+        if self.printing: print(f'Lickometer.watch_licks: {order_result}')
+
+        # Wait for response
+        while self.input() < 1:
+            pass
+
+        # Parameters
+        lick_result = self.read_i8()
+        # lick_result2 = self.read_line()
+        if self.printing: print(f'Lickometer.watch_licks({lick_result}-->{lick_result:03})\n')
+        # print(f'Lickometer.watch_licks({lick_result2})')
+
+        return f"{lick_result:03}"
+
+    def set_side(self, side: str):
+        # Order
+        self.write_order(self.Order.SIDE)
+        order_result = self.read_order()
+        if self.printing: print(f'Lickometer.set_side: {order_result}')
+
+        # Parameter
+        self.write_order(self.command[side])
+        side_selected = self.read_order()
+        side_result = self.read_order()
+        if self.printing: print(f'Lickometer.set_side({side_selected}, {side_result})\n')
 
     def reward(self, side: str, size=-1):
+        # Set reward size
+        if not size == -1:
+            self.set_size(size)
         # 'up' lickometer: 100%
-        if side == 'up':
+        elif side == 'up':
             self.set_size(self.rew_size)
-        if side != 'up':
+        elif side != 'up':
             s = self.current_size()
             self.set_size(s)
 
-        # set reward size
-        if not size == -1:
-            self.set_size(size)
+        # Set rewarding side
+        self.set_side(side=side)
 
-        # set rewarding side
-        self.write_order(self.Order.SIDE)
-        self.write_order(self.command[side])
-        result = self.read_line()
-        if self.printing: print(f'-->Lickometer.reward(side): {result}')
-
-        # give reward
+        # Give reward
+        # Order
         self.write_order(self.Order.REW)
-        result2 = self.read_line()
-        if self.printing: print(f'->Lickometer.reward(state): {result2}')
-        return self.read_line()
+        order_result = self.read_order()
+        if self.printing: print(f'Lickometer.reward: {order_result}')
+        time.sleep(0.1)
+
+        # Results
+        reward_result = self.read_order()
+        if self.printing: print(f'Lickometer.reward({reward_result})\n')
+        return reward_result
 
     def punish(self):
         self.write_order(self.Order.NOR)
         result = self.read_line()
-        if self.printing: print(f'-->Lickometer.punish: {result}')
+        if self.printing: print(f'Lickometer.punish: {result}')
 
 
 if __name__ == '__main__':
@@ -398,13 +452,53 @@ if __name__ == '__main__':
     arduino.reward('up')
     time.sleep(3)
     """
-    [arduino.set_size(i) for i in range(10)]
 
-    #kap = [arduino.current_size() for kim in range(10)]
+    """
+    arduino.set_size(2, ['up', 'left'])
 
-    sides = ['up', 'left', 'right']
-    arduino.calibrate_pump([], 0.01, 255)
     arduino.set_size(1)
+
+    arduino.calibrate_pump(0.02, 200, ['left', 'right'])
+    arduino.calibrate_pump(0.1, 255)
+
+    arduino.set_timeout(3)
+    arduino.set_timeout(float('inf'))
+
+    arduino.set_side('up')
+    """
+
+    arduino.set_size(1)
+    arduino.calibrate_pump(2, 255)
+
+    print('\n\t----Testing:----\n\n')
+
+    # arduino.set_timeout(5)
+    resp = arduino.watch_licks()
+    print(f"I've got: {resp}, type: {type(resp)}")
+
+    arduino.reward('up')
+    arduino.calibrate_pump(3, 200, ['left'])
+    arduino.reward('left')
+    time.sleep(5)
+    arduino.set_size(3, ['left'])
+    arduino.reward('left', 3)
+    print("Fin")
+
+    exit(214)
+
+    arduino.reward('left', 1)
+    time.sleep(0.5)
+    arduino.reward('up', 1)
+    time.sleep(0.5)
+    arduino.reward('right', 1)
+    time.sleep(0.5)
+    arduino.reward('up', 1)
+    time.sleep(2)
+    arduino.reward('cat')
+    print("Itt vok")
+    time.sleep(3)
+
+    exit(111)
 
     for i in range(20):
         print(f"Iteration: {i}.")

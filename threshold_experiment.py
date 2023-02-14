@@ -141,7 +141,7 @@ class TwoAFC:
             self.lick_o_meter.reward(side)
 
     def wait_for_lickometer(self, enabled_lickometers:list, timeout=float('inf')):
-        '''
+        """
 
         Parameters
         ----------
@@ -151,7 +151,7 @@ class TwoAFC:
         Returns
         -------
         str: which lickometer the subject was licking into
-        '''
+        """
         kopt = ['up', 'left', 'right']
         print(f"Waiting for lick for {timeout} seconds")
         if self.lickemu:  # wait for mouse press
