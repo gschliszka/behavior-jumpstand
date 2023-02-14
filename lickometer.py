@@ -81,14 +81,14 @@ class RewardAmount:
 
 class Protocol(Arduino, RewardAmount):
     def __init__(self, rate=19200, timeout=1, contingency_percent=80, rew_size=1):
-        # print('Start __init__ of Protocol...')
+        print('Start __init__ of Protocol...')
         super(Protocol, self).__init__(rate=rate, timeout=timeout, contingency_percent=contingency_percent, rew_size=rew_size)
         self.version = self.read_line()
         self.initial_values = self.read_line()
         self.command = {i.name.lower(): i for i in self.Order}
         self.printing = True
-        # print('End __init__ of Protocol')
-        # print(f"\tv: {self.version}\n\tinit.val: {self.initial_values}")
+        print('End __init__ of Protocol')
+        print(f"\tv: {self.version}\n\tinit.val: {self.initial_values}")
 
     class Order(Enum):
         """
