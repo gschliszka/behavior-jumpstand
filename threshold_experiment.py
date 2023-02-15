@@ -1,6 +1,8 @@
-'''Decrease motion duration while teaching animal to discriminate vertical vs horizontal orientation.
+"""
+Decrease motion duration while teaching animal to discriminate vertical vs horizontal orientation.
 This code assumes animal knows lickometer and jump stand.
-'''
+"""
+
 import sys
 sys.modules['debugmp'] = None
 import time
@@ -29,6 +31,7 @@ sys.excepthook = debughook
 machine_dict = {'LabThinkpadStim': 101707888628436,
                 '2pgoe': 93181002139480,
                 'Gazsi::laptop': 220292358129433}
+
 
 class TwoAFC:
     def __init__(self, lickemu, touchscreen=False, show_messages=False, windowed=None):
@@ -122,39 +125,48 @@ class TwoAFC:
         -------
 
         """
+
         self.feedback_sound['punish'].stop()
         self.feedback_sound['punish'].play()
-        # if not self.lickemu:
-        #     self.lick_o_meter.punish()
 
     def bridge_reward(self):
         """
         Emits positive reinforcement sound.
         """
+
         self.feedback_sound['reward'].stop()
         self.feedback_sound['reward'].play()
 
     def deliver_reward(self, side: str):
-        """ Delivers reward with lickometer """
+        """
+        Delivers reward with lickometer
+        """
+
         self.bridge_reward()
         if not self.lickemu:
             self.lick_o_meter.reward(side)
 
     def wait_for_lickometer(self, enabled_lickometers:list, timeout=float('inf')):
         """
+        Wait for subject to respond.
 
         Parameters
         ----------
-        id: which lickometer response is valid. possible options 'up', 'left', 'right'
-        timeout: in seconds, will return with None if no lick event occurred.
+        enabled_lickometers : list
+            Which lickometer response is valid. possible options 'up', 'left', 'right'
+        timeout : int, optional, (0; inf]
+            Duration of waiting for licking in seconds. Default is inf.
 
         Returns
         -------
-        str: which lickometer the subject was licking into
+        str: Which lickometer the subject was licking into. If timeout return None.
         """
+
         kopt = ['up', 'left', 'right']
         print(f"Waiting for lick for {timeout} seconds")
-        if self.lickemu:  # wait for mouse press
+
+        # wait for pressed keys
+        if self.lickemu:
             tc = core.Clock()
             print(f"started! {tc.getTime()}")
             key = event.waitKeys(maxWait=timeout, clearEvents=True)  # wait for participant to respond
@@ -179,6 +191,8 @@ class TwoAFC:
             else:
                 print(f'good: {key[-1]}')
                 return key[-1]
+
+        # wait for mouse press
         else:
             # if cat licks into non-valid lickometers, give punishment
             tc = core.Clock()
@@ -188,15 +202,20 @@ class TwoAFC:
             licks = self.lick_o_meter.watch_licks()
             t = time.time()-t
             print(f"-----> waited for: {t}s")
+
+            # Quit if Esc pressed
             if event.getKeys(keyList=["escape"]):
                 print("'ESC' key detected, quit")
                 core.quit()
+
+            # Transform licks to resp
             if licks in ['100', '010', '001']:
                 resp = kopt[licks.index('1')]
             else:
                 resp = None
             # print(resp)
 
+            # Return None or resp
             if resp is None:
                 print('no lickometer response (timeout)')
                 return  # there was no lick, timeout
@@ -207,7 +226,20 @@ class TwoAFC:
                 print(f'good: {resp}')
                 return resp
 
-    def is_touched(self, stimuli:dict, m_loc):
+    def is_touched(self, stimuli: dict, m_loc):
+        # TODO: here I'm
+        """
+
+        Parameters
+        ----------
+        stimuli
+        m_loc
+
+        Returns
+        -------
+
+        """
+
         win_keys = [sk1 for sk1 in self.win.keys()]
         fix_pos = [-960, 0]  # to set mouses' position out of screen
 
