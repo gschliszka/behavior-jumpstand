@@ -245,7 +245,7 @@ class TwoAFC:
         win_keys = [sk1 for sk1 in self.win.keys()]
         fix_pos = [-960, 0]  # to set mouses' position out of screen
 
-        # TODO: delete next 3 lines & check
+        # TESTME: TODO: delete next 3 lines & check
         # [self.mouse[k1].setPos(fix_pos) for k1 in win_keys]  # set to outside screen so that actual touch represents a big change between current mouse position and the touch coordinate
         # m_loc = [self.mouse[sk1].getPos() for sk1 in win_keys]
         # print(f"m_loc: {m_loc}")
@@ -280,6 +280,7 @@ class TwoAFC:
     def iterate_motion_time_grating_2afc(self, grating, messages, time_dict, trial_clock):
         # TODO: documentation
         # TODO: save data as train_jumping
+
         if messages: messages['pre'].draw()
         [self.win[sk1].flip() for sk1 in self.win.keys() if self.win[sk1] is not None]
         core.wait(time_dict['message'])
@@ -300,7 +301,7 @@ class TwoAFC:
         core.wait(time_dict['message'])
         # show moving grating on both screens
         trial_clock.reset()
-        mpress = [0,0]
+        mpress = [0, 0]
         ctime = trial_clock.getTime()
         [self.mouse[k1].getPos() for k1 in self.mouse.keys()]
         mouse_loc = [self.mouse[k1].getPos() for k1 in grating.keys()]
@@ -312,9 +313,19 @@ class TwoAFC:
                     grating[sk].phase = numpy.mod(trial_clock.getTime(), 1)
                 grating[sk].draw()
 
-                sys.modules['debugmp']=None
+                sys.modules['debugmp'] = None
 
+                # TODO: this if statement moved into self.is_touched()
+                # if touchscreens are used
                 if self.touchsc:
+                    # TESTME: use self.is_touched() then TODO: delete block comment
+                    mpress = self.is_touched(grating, mouse_loc)
+
+                    # TESTME: in previous version, break and continue were used
+                    if any(mpress) and not all(mpress):
+                        break
+
+                    """
                     mouse_pos = [self.mouse[k1].getPos() for k1 in grating.keys()]
                     if all([(mouse_pos[i] == mouse_loc[i]).all() for i in range(len(mouse_pos))]):
                         pass
@@ -335,7 +346,11 @@ class TwoAFC:
                             # move mice out of grating stimuli
                             [self.mouse[k1].setPos([-900, 0]) for k1 in grating.keys()]
                             break
+                        """
+
+                # if mouse is used
                 else:
+                    # TODO: this is basically the same of 'if' part --> if mouse will be used, it must be rewrite
                     if any([any(self.mouse[k1].getPressed()) for k1 in grating.keys()]):
                         mouse_pos = [self.mouse[k1].getPos() for k1 in grating.keys()]
                         if all([(mouse_pos[i] == mouse_loc[i]).all() for i in range(len(mouse_pos))]):
@@ -358,20 +373,6 @@ class TwoAFC:
                                 [self.mouse[k1].setPos([-900, 0]) for k1 in grating.keys()]
                                 break
 
-                    """
-                    mpos1 = [self.mouse[k1].getPos() for k1 in grating.keys()]
-                    mpress = [self.mouse[k1].isPressedIn(grating[k1]) for k1 in grating.keys()]
-                    mpos2 = [self.mouse[k1].getPos() for k1 in grating.keys()]
-                    if all(mpress):  # simply check if coordinates remained the same
-
-                        sys.modules['debugmp'] = [mpos1, mpos2, grating.values()]
-                        print(sys.modules['debugmp'])
-
-                        k1 = list(grating.keys())[1]
-                        print(self.mouse[k1].isPressedIn(grating[k1]))
-                    time.sleep(0.01)
-                    if any(mpress):
-                        break"""
             ctime = trial_clock.getTime()
             [self.win[sk1].flip() for sk1 in self.win.keys() if self.win[sk1] is not None]
 
@@ -510,6 +511,10 @@ class TwoAFC:
 
                     m_press = self.is_touched(t_stim, m_loc)    # read touches
 
+                    # TESTME: in previous version, break and continue were used
+                    if any(m_press) and not all(m_press):
+                        break
+
                     trial_time_elapsed = trialclock.getTime()
 
             [sv.draw() for sv in gray_stim.values()]  # after cat jumps or timeout: switch both screens to gray
@@ -557,6 +562,7 @@ class TwoAFC:
                     self.deliver_reward(jump_rew_response)
                 core.wait(1)
 
+            # TODO: delete these lines if next TEST works
             """
             # jumped to non-target
             if t_stim[j_choice].name != 'grating':  
@@ -615,12 +621,29 @@ class TwoAFC:
         return trial_outcome, trial_times, entry_times
 
     def init_output(self, motion):
-        # TODO: here I'm
-        try:  # try to get a previous parameters file
+        """
+        Create all output files and read input files.
+
+        Parameters
+        ----------
+        motion : dict
+            Time variables used for motion control.
+
+        Returns
+        -------
+        expInfo, dataFile, fileName
+        """
+
+        # TODO: include train_jumping files too (?)
+        # try to get a previous parameters file
+        try:
             expInfo = fromFile('lastParams.pickle')
-        except:  # if not there then use a default set
+        # if not there then use a default set
+        except:
             expInfo = {'observer': 'jwp', 'motion_duration': motion['duration_max_s']}
+
         expInfo['dateStr'] = data.getDateStr()  # add the current time
+
         # present a dialogue to change params
         if 0:
             dlg = gui.DlgFromDict(expInfo, title='motion duration experiment', fixed=['dateStr'])
@@ -633,19 +656,47 @@ class TwoAFC:
         fileName = expInfo['observer'] + expInfo['dateStr']
         dataFile = open(fileName + '.csv', 'w')  # a simple text file with 'comma-separated-values'
         dataFile.write('targetOri,jumpedOri,motionTime,correct\n')
+
         return expInfo, dataFile, fileName
 
     def init_stimulus(self):
+        """
+        Initiate stimuli
+
+        Define required parameters for stimuli generation and stimuli timing.
+
+        Returns
+        -------
+        grating : dict
+            Stimuli in a dictionary where keys are sides.
+        messages : dict or None
+            All text shown on screens in a dictionary (pre, trial, post) if self.show_messages.
+            Else None
+        time_dict : dict
+            Jump & lick timeouts and message duration.
+        intertrial : dict
+            Gray screens (stimuli)
+        trial_clock : psychopy.core.Clock()
+
+        motion : dict
+            Stimuli motion controlling parameters.
+        orientation : dict
+            Target and alternative stimulus's orientation.
+        """
+
         # Parameters
         motion = {'duration_max_s': 3, 'speed_cycles_per_second': 0.5}
         time_dict = {'jump_timeout': motion['duration_max_s'] + 3,
                      'message': 0.5,
                      'lick_timeout': 2}
-    
-        orientation = {'target': 0, 'alternative': 90}  # target is rewarded, alternative is not rewarded
 
-        grating = {sk1: visual.GratingStim(self.win[sk1], sf=self.grating_p['spatial_freq_deg_per_pix'], size=self.grating_p['size'][sk1], pos=self.grating_p['pos'][sk1], mask='gauss',
+        # target is rewarded, alternative is not rewarded
+        orientation = {'target': 0, 'alternative': 90}
+
+        grating = {sk1: visual.GratingStim(self.win[sk1], sf=self.grating_p['spatial_freq_deg_per_pix'],
+                                           size=self.grating_p['size'][sk1], pos=self.grating_p['pos'][sk1], mask='gauss',
                                            ori=orientation[k1],) for k1, sk1 in zip(orientation.keys(), self.win.keys())}
+
         if not self.windowed:
             for sk1 in self.win.keys():
                 size1 = [ss1*0.1 for ss1 in self.win[sk1].size]
@@ -653,11 +704,13 @@ class TwoAFC:
                 min_size = min([ss1 for ss1 in self.win[sk1].size])
                 size2 = [min_size, min_size]
                 grating[sk1].setSize(size2, units='pix')
+
         from psychopy.tools.monitorunittools import posToPix
         ptxt = ' '.join([repr(posToPix(grating[gk1])) for gk1 in grating.keys()])
         print(f"grating positions {ptxt}")
     
-        intertrial = {sk1: visual.GratingStim(self.win[sk1], sf=0, color=0, colorSpace='rgb', size=self.win[sk1].size[0], tex=None,) for sk1 in self.win.keys()}
+        intertrial = {sk1: visual.GratingStim(self.win[sk1], sf=0, color=0, colorSpace='rgb',
+                                              size=self.win[sk1].size[0], tex=None,) for sk1 in self.win.keys()}
     
         # and some handy clocks to keep track of time
         trial_clock = core.Clock()
@@ -675,7 +728,10 @@ class TwoAFC:
         return grating, messages, time_dict, intertrial, trial_clock, motion, orientation
     
     def run_staircase(self, up_steps=1, down_steps=3):
+        """"""
+
         grating, messages, time_dict, intertrial, trial_clock, motion, orientation = self.init_stimulus()
+        # TODO: rearrange code?: move init_output() out if this function to use in train_jumping too
         expInfo, dataFile, fileName = self.init_output(motion)
     
         # create the staircase handler
@@ -684,15 +740,20 @@ class TwoAFC:
                                   nUp=up_steps, nDown=down_steps,  # will home in on the 80% threshold
                                   nTrials=3, # nTrials means at least this many time the parameter will change even if all responses are correct
                                   nReversals=3)
-    
-        for thisIncrement in staircase:  # will continue the staircase until it terminates!
+
+        # will continue the staircase until it terminates!
+        for thisIncrement in staircase:
             # Show stimulus and let subject make a choice (mouse/touch screen response)
             time_dict['motion'] = thisIncrement
             print(f"--------\ntrial {len(staircase.data)}, motion time: {thisIncrement}, staircase trial {staircase.thisTrialN} reversals {len(staircase.reversalIntensities)}")
+
             result = None  # initialize to non-defined so that staircase is updated only after checking all possible outcomes
+
+            # Run 2AFC trial
             mouse_choice, choice_time_s = self.iterate_motion_time_grating_2afc(grating, messages, time_dict, trial_clock)
-    
-            if choice_time_s >= time_dict['jump_timeout']:  # did not jump within allowed time interval
+
+            # did not jump within allowed time interval
+            if choice_time_s >= time_dict['jump_timeout']:
                 self.punish()
                 [intertrial[sk1].draw() for sk1 in intertrial.keys()]
                 if messages:
@@ -775,31 +836,49 @@ class TwoAFC:
         core.quit()
     
 
-def random_training_stim(stim_list:list, win_keys:list):
+def random_training_stim(stim_list: list, win_keys: list):
+    """
+    Randomly swap training stimulus
+
+    Parameters
+    ----------
+    stim_list : list
+        Set of stimuli
+    win_keys : list
+        Windows keys
+
+    Returns
+    -------
+    dict : {k: stim_list[i][k] for i, k in enumerate(win_keys)}
+    """
+
     if random.choice([0, 1]):
         s1 = stim_list[0]
         stim_list[0] = stim_list[1]
         stim_list[1] = s1
+
     return {k: stim_list[i][k] for i, k in enumerate(win_keys)}
 
 
-def random_swap(previous:dict):
+def random_swap(previous: dict):
+    """
+    Randomly swap dictionary's values
+
+    Parameters
+    ----------
+    previous: dict with two keys
+
+    Returns
+    -------
+    dict with values swapped in a random fashion (i.e. sometimes swapped, other times left as is)
     """
 
-   Parameters
-   ----------
-   previous: dict with two keys
-
-   Returns
-   -------
-   dict with values swapped in a random fashion (i.e. sometimes swapped, othertimes left as is)
-
-    """
     if random.choice([0, 1]):
         dkeys = list(previous.keys())
         r_temp = previous[dkeys[0]].ori
         previous[dkeys[0]].ori = previous[dkeys[1]].ori
         previous[dkeys[1]].ori = r_temp
+
     return previous
 
 
