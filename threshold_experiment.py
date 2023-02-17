@@ -245,11 +245,6 @@ class TwoAFC:
         win_keys = [sk1 for sk1 in self.win.keys()]
         fix_pos = [-960, 0]  # to set mouses' position out of screen
 
-        # TESTME: TODO: delete next 3 lines & check
-        # [self.mouse[k1].setPos(fix_pos) for k1 in win_keys]  # set to outside screen so that actual touch represents a big change between current mouse position and the touch coordinate
-        # m_loc = [self.mouse[sk1].getPos() for sk1 in win_keys]
-        # print(f"m_loc: {m_loc}")
-
         # if touchscreens are used
         if self.touchsc:
             m_pos = [self.mouse[k1].getPos() for k1 in win_keys]
@@ -277,6 +272,32 @@ class TwoAFC:
                 else:
                     return [0, 0]
 
+        """
+        else:
+            # this is basically the same of 'if' part --> if mouse will be used, it must be rewrite
+            if any([any(self.mouse[k1].getPressed()) for k1 in grating.keys()]):
+                mouse_pos = [self.mouse[k1].getPos() for k1 in grating.keys()]
+                if all([(mouse_pos[i] == mouse_loc[i]).all() for i in range(len(mouse_pos))]):
+                    pass
+                else:
+                    stim_contain = [grating[k1].contains(self.mouse[k1]) for k1 in grating.keys()]
+                    # print(stim_contain)
+                    if all(stim_contain):
+                        print(f"both stimulus touched")
+                        sys.modules['debugmp'] = [mouse_pos[0], mouse_pos[1], grating.values()]
+                        print(sys.modules['debugmp'])
+
+                        k1 = list(grating.keys())[1]
+                        [self.mouse[k1].setPos([-900, 0]) for k1 in grating.keys()]
+                        stim_contain = [grating[k1].contains(self.mouse[k1]) for k1 in grating.keys()]
+                        continue
+                    if any(stim_contain):
+                        mpress = stim_contain
+                        # move mice out of grating stimuli
+                        [self.mouse[k1].setPos([-900, 0]) for k1 in grating.keys()]
+                        break
+        """
+
     def iterate_motion_time_grating_2afc(self, grating, messages, time_dict, trial_clock):
         # TODO: documentation
         # TODO: save data as train_jumping
@@ -286,6 +307,7 @@ class TwoAFC:
         core.wait(time_dict['message'])
 
         # keep screens blank until subject licks into lickometer on the stand
+        # TODO: after timeout, no need to lick
         entry_response = self.wait_for_lickometer(['up'])
         if not self.lickemu and entry_response == 'up':
             self.lick_o_meter.reward('up')
@@ -315,63 +337,10 @@ class TwoAFC:
 
                 sys.modules['debugmp'] = None
 
-                # TODO: this if statement moved into self.is_touched()
-                # if touchscreens are used
-                if self.touchsc:
-                    # TESTME: use self.is_touched() then TODO: delete block comment
-                    mpress = self.is_touched(grating, mouse_loc)
+                mpress = self.is_touched(grating, mouse_loc)
 
-                    # TESTME: in previous version, break and continue were used
-                    if any(mpress) and not all(mpress):
-                        break
-
-                    """
-                    mouse_pos = [self.mouse[k1].getPos() for k1 in grating.keys()]
-                    if all([(mouse_pos[i] == mouse_loc[i]).all() for i in range(len(mouse_pos))]):
-                        pass
-                    else:
-                        stim_contain = [grating[k1].contains(self.mouse[k1]) for k1 in grating.keys()]
-                        # print(stim_contain)
-                        if all(stim_contain):
-                            print(f"both stimulus touched")
-                            sys.modules['debugmp'] = [mouse_pos[0], mouse_pos[1], grating.values()]
-                            print(sys.modules['debugmp'])
-
-                            k1 = list(grating.keys())[1]
-                            [self.mouse[k1].setPos([-900, 0]) for k1 in grating.keys()]
-                            stim_contain = [grating[k1].contains(self.mouse[k1]) for k1 in grating.keys()]
-                            continue
-                        if any(stim_contain):
-                            mpress = stim_contain
-                            # move mice out of grating stimuli
-                            [self.mouse[k1].setPos([-900, 0]) for k1 in grating.keys()]
-                            break
-                        """
-
-                # if mouse is used
-                else:
-                    # TODO: this is basically the same of 'if' part --> if mouse will be used, it must be rewrite
-                    if any([any(self.mouse[k1].getPressed()) for k1 in grating.keys()]):
-                        mouse_pos = [self.mouse[k1].getPos() for k1 in grating.keys()]
-                        if all([(mouse_pos[i] == mouse_loc[i]).all() for i in range(len(mouse_pos))]):
-                            pass
-                        else:
-                            stim_contain = [grating[k1].contains(self.mouse[k1]) for k1 in grating.keys()]
-                            # print(stim_contain)
-                            if all(stim_contain):
-                                print(f"both stimulus touched")
-                                sys.modules['debugmp'] = [mouse_pos[0], mouse_pos[1], grating.values()]
-                                print(sys.modules['debugmp'])
-
-                                k1 = list(grating.keys())[1]
-                                [self.mouse[k1].setPos([-900, 0]) for k1 in grating.keys()]
-                                stim_contain = [grating[k1].contains(self.mouse[k1]) for k1 in grating.keys()]
-                                continue
-                            if any(stim_contain):
-                                mpress = stim_contain
-                                # move mice out of grating stimuli
-                                [self.mouse[k1].setPos([-900, 0]) for k1 in grating.keys()]
-                                break
+                if any(mpress) and not all(mpress):
+                    break
 
             ctime = trial_clock.getTime()
             [self.win[sk1].flip() for sk1 in self.win.keys() if self.win[sk1] is not None]
@@ -422,6 +391,8 @@ class TwoAFC:
         print("\n\tStarting train_jumping()...")
         print(f"within: {jump_within_s}\n%: {percent_correct_required}\nenter: {enter_timeout_s}")
 
+        # TODO: add self.init_train_jumping_stimulus()
+
         fix_pos = [-960, 0]     # to set mouses' position out of screen
 
         trialclock = core.Clock()
@@ -470,13 +441,17 @@ class TwoAFC:
             entry_times.append([])
             while entry_response is None:
                 entry_response = self.wait_for_lickometer(['up'], timeout=enter_timeout_s)
+
                 if not self.lickemu and entry_response == 'up':
                     self.bridge_reward()
+                    # TODO: after wrong jump, no reward?
                     self.lick_o_meter.reward('up')
                     print(f"licked at {entry_response}, entry response")
+
                 if entry_response is None:
                     self.punish()
                     print(f"\n PUSH CAT HEAD GENTLY TOWARDS LICKOMETER!\n")
+
                 entry_times[-1].append(trialclock.getTime())
             entry_response = None  # reset so that licking into 'up' lickometer is required in next trial again
 
@@ -509,9 +484,9 @@ class TwoAFC:
                     [sv.draw() for sv in t_stim.values()]
                     [self.win[sk1].flip() for sk1 in win_keys if self.win[sk1] is not None]
 
-                    m_press = self.is_touched(t_stim, m_loc)    # read touches
+                    # read touches
+                    m_press = self.is_touched(t_stim, m_loc)
 
-                    # TESTME: in previous version, break and continue were used
                     if any(m_press) and not all(m_press):
                         break
 
@@ -535,6 +510,9 @@ class TwoAFC:
 
                 print("timeout, you are too slow...")
 
+                # in next trial, do not wait for entry response
+                entry_response = ''
+
             # add fail trial and punish if jumped to non-target
             elif t_stim[j_choice].name != 'grating':
                 self.punish()
@@ -544,9 +522,6 @@ class TwoAFC:
 
                 print(f"bad choice")
 
-                # in next trial, do not wait for entry response
-                entry_response = ''
-
             # add success trial if jumped within time, has to restart from 'up' lickometer
             else:
                 self.bridge_reward()
@@ -562,57 +537,10 @@ class TwoAFC:
                     self.deliver_reward(jump_rew_response)
                 core.wait(1)
 
-            # TODO: delete these lines if next TEST works
-            """
-            # jumped to non-target
-            if t_stim[j_choice].name != 'grating':  
-                self.punish()
-                
-                trial_outcome.append(False)
-                trial_times.append(trialclock.getTime())
-                
-                print(f"bad choice")
-                
-                # in next trial, do not wait for entry response
-                entry_response = ''
-
-                
-                # FIXME: eliminate code duplication!
-                trialclock.reset()
-                trial_time_elapsed = trialclock.getTime()
-                t_stim = random_training_stim(stim_list, win_keys)
-                core.wait(3)
-                continue
-
-            # add success trial if jumped within time, has to restart from 'up' lickometer
-            if trial_time_elapsed < jump_within_s:
-                self.bridge_reward()
-                
-                trial_outcome.append(True)
-                trial_times.append(trialclock.getTime())
-
-                print("good job, level up")
-                
-                # active rewarding: reward delivered only if cat licks
-                jump_rew_response = self.wait_for_lickometer([j_choice], timeout=enter_timeout_s)
-                if jump_rew_response == j_choice:
-                    self.deliver_reward(jump_rew_response)
-                core.wait(1)
-
-            # add fail trial and punish if timeout, it has to restart from licking into the 'up' lickometer
-            else:
-                self.punish()
-                
-                trial_outcome.append(False)
-                trial_times.append(trialclock.getTime())
-                
-                print("timeout, you are too slow...")"""
-
-            # TESTME: check the new version!
+            t_stim = random_training_stim(stim_list, win_keys)
             core.wait(3)
             trialclock.reset()
             trial_time_elapsed = trialclock.getTime()
-            t_stim = random_training_stim(stim_list, win_keys)
 
         print(f"Trial successes: {trial_outcome} --> percent correct: {sum(trial_outcome[-eval_win:])/eval_win}\n"
               f"\t>>> result: {sum(trial_outcome[-eval_win:])/eval_win >= percent_correct_required/100}\n"
@@ -762,10 +690,12 @@ class TwoAFC:
                 continue
     
             print(f"mouse clicked {mouse_choice}")
+
             # remove patterns from screen upon jump
             [i1.draw() for i1 in intertrial.values()]
             [w.flip() for w in self.win.values()]
             jump_choice = 'left' if mouse_choice[0] else 'right'
+
             # Provide bridge reward for correct mouse click/touchscreen choice
             if grating[jump_choice].ori != orientation['target']:
                 # if wrong choice, no need to wait for lickometer
@@ -898,8 +828,7 @@ if __name__ == '__main__':
     n_up = 2 if train_basic_task else 1
     experiment = TwoAFC(lickemu=lickemu, touchscreen=True, show_messages=False, windowed=args.windowed)
     stair_params = {'up_steps': n_up, 'down_steps': n_down}
+
     experiment.train_jumping(jump_within_s=3, percent_correct_required=80, enter_timeout_s=3)
-    # core.wait(1)
-    # core.quit()
     experiment.run_staircase(**stair_params)
 
