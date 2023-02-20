@@ -372,7 +372,10 @@ class TwoAFC:
         while (ctime < time_dict['jump_timeout']) and not any(mpress):
             for sk in grating.keys():
                 # move grating until specified time then leave last grating phase constant until timeout time
-                if trial_clock.getTime() < time_dict['motion']:
+                if (
+                    trial_clock.getTime() < time_dict['motion'] or
+                    time_dict['jump_timeout']/2 < trial_clock.getTime() < time_dict['jump_timeout']/2 + time_dict['motion']
+                ):
                     grating[sk].phase = numpy.mod(trial_clock.getTime(), 1)
                 grating[sk].draw()
 
@@ -579,7 +582,8 @@ class TwoAFC:
                 core.wait(1)
 
             t_stim = random_training_stim(stim_list, win_keys)
-            core.wait(3)
+            # TODO: add timing parameter to wait()
+            core.wait(0.1)
             trialclock.reset()
             trial_time_elapsed = trialclock.getTime()
 
