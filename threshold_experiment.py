@@ -32,6 +32,12 @@ machine_dict = {'LabThinkpadStim': 101707888628436,
                 '2pgoe': 93181002139480,
                 'Gazsi::laptop': 220292358129433}
 
+# TODO: rearrange code as lickomter.py, actions.py and experiment.py
+#       - lickometer.py: communication
+#       - actions.py: reward, punish, ... ect. (building blocks for experiments/trainings)
+#       - experiment.py/training.py: the actual experiment/training (train_jumping, iterate_motion_time_grating_2afc &
+#       run_staircase)
+
 
 class TwoAFC:
     def __init__(self, lickemu, touchscreen=False, show_messages=False, windowed=None):
@@ -109,7 +115,11 @@ class TwoAFC:
             'spatial_freq_deg_per_pix': grating_period_in_pixels,
             'speed_Hz': 7.5,   # how many periods pass in a second
         }
-        self.feedback_sound = {'reward': sound.Sound('mixkit-gaming-lock-2848.wav'), 'punish': sound.Sound('pinknoise.wav', stopTime=0.6)}
+
+        # absolute volume: set the default volume of the sound cues
+        self.feedback_sound_absolute_volume = {'reward': 1, 'punish': 1}
+        self.feedback_sound = {'reward': sound.Sound('mixkit-gaming-lock-2848.wav', volume=self.feedback_sound_absolute_volume['reward']),
+                               'punish': sound.Sound('pinknoise.wav', volume=self.feedback_sound_absolute_volume['punish'], stopTime=0.6)}
 
         # create window(s): if only one screen detected, use the same screen for both 'left' and 'right' stimulus windows
         self.win = {sk1: visual.Window([self.window_p['size']['width'], self.window_p['size']['height']], allowGUI=True, screen=si1,
@@ -117,22 +127,53 @@ class TwoAFC:
                        zip(screen_ids,self.window_p['pos'].keys())}  # emulation mode on single screen
         self.mouse = {wk: event.Mouse(win=wv) for wk,wv in self.win.items()}
 
-    def punish(self):
+    def punish(self, volume=1):
         """
         Gives punish cue.
-        # TODO: make punish sizeable (set_size()) --> volume-control
+
+        Parameters
+        ----------
+        volume : float, optional (default is 1)
+            Multiply the volume of the last time played punishing sound then apply to this punishing.
+            new_volume = last_volume * volume
         Returns
         -------
 
         """
 
+        if volume == 1:
+            self.feedback_sound['punish'].volume = 1
+        else:
+            self.feedback_sound['punish'].volume = volume
+            self.feedback_sound_absolute_volume['punish'] *= volume
+            print(f"Punish sound's volume: {volume}x last_punish_played_volume, absolute volume: "
+                  f"{self.feedback_sound_absolute_volume['punish']}")
+
         self.feedback_sound['punish'].stop()
         self.feedback_sound['punish'].play()
 
-    def bridge_reward(self):
+    def bridge_reward(self, volume=1):
         """
         Emits positive reinforcement sound.
+
+        Parameters
+        ----------
+        volume : float, optional (default is 1)
+            Multiply the volume of the last time played rewarding sound then apply to this rewarding.
+            new_volume = last_volume * volume
+
+        Returns
+        -------
+
         """
+
+        if volume == 1:
+            self.feedback_sound['reward'].volume = 1
+        else:
+            self.feedback_sound['reward'].volume = volume
+            self.feedback_sound_absolute_volume['reward'] *= volume
+            print(f"Reward sound's volume: {volume}x last_reward_played_volume, absolute volume: "
+                  f"{self.feedback_sound_absolute_volume['reward']}")
 
         self.feedback_sound['reward'].stop()
         self.feedback_sound['reward'].play()
