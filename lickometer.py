@@ -113,6 +113,7 @@ class Protocol(Arduino, RewardAmount):
         SET_TIMEOUT = 31
         SET_SIZE = 32
         CALIBRATE = 33
+        SET_WASHSPEED = 34
 
         # control
         INVALID_ORDER = 90
@@ -214,6 +215,40 @@ class Lickometer(Protocol):
         super(Lickometer, self).__init__(**kwargs)
         self.allowed_pumps = ['up', 'left', 'right']
 
+    def set_wash_speed(self, speed: int, pumps=None):
+        """
+        Set the motor speed for washing and TTL-controlled rewarding.
+
+        Parameters
+        ----------
+        speed : int
+            The new speed applied for washing or TTL-controlled rewarding.
+        pumps : list, optional
+            List of pumps that changes. (Default: ['all'])
+
+        Returns
+        -------
+
+        """
+
+        if not pumps:
+            pumps = ['all']
+
+        for p in pumps:
+            # Order
+            self.write_order(self.Order.SET_WASHSPEED)
+            order_result = self.read_order()
+            if self.printing: print(f'Lickometer.set_wash_speed: {order_result}')
+
+            # Parameters
+            #   pump
+            self.write_order(self.command[p])
+            pump_result = self.read_order()
+            #   wash speed
+            self.write_i16(speed)
+            speed_result = self.read_i16()
+            if self.printing: print(f'Lickometer.set_wash_speed({pump_result}, {speed_result})\n')
+
     def set_size(self, size: int, pumps=None):
         """
         Set the reward size of requested pumps.
@@ -223,7 +258,7 @@ class Lickometer(Protocol):
         size : int
             reward_length = motor_time * size
         pumps : list, optional
-            List of sides that changes. (Default: ['all'])
+            List of pumps that changes. (Default: ['all'])
 
         Returns
         -------
@@ -259,7 +294,7 @@ class Lickometer(Protocol):
         motor_speed : int, [0; 255]
             Speed value of the pump which goes to the motor shield.
         pumps : list, optional
-            List of sides that changes. (Default: ['all'])
+            List of pumps that changes. (Default: ['all'])
 
         Returns
         -------
